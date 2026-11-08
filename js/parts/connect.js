@@ -5,7 +5,16 @@
 import { html, useState, useEffect, useRef, Icon, Btn, Field, Chip } from '../ui.js';
 import { rpc, edge } from '../api.js';
 import { loadAssets, loadDevices } from '../data.js';
-import { ago, sourceName } from '../util.js';
+import { ago, sourceName, vinClean } from '../util.js';
+
+// a GPS company's data, made to fit the fleet's rules (p003 refuses what doesn't): a VIN only if it is one, a plate only
+// if it looks like one, the name without < > and at most 40 characters — the vehicle is added either way
+const fit = (v) => {
+  const vin = vinClean(v.vin);
+  const plate = String(v.plate || '').trim();
+  return { unit_no: (String(v.name || v.external_id || '').replace(/[<>]/g, '').trim() || String(v.external_id)).slice(0, 40),
+    vin: vin.length === 17 && !/[IOQ]/.test(vin) ? vin : '', plate: /^[A-Za-z0-9][A-Za-z0-9 -]{0,9}$/.test(plate) ? plate : '', kind: 'truck' };
+};
 
 export function ProviderLogo({ p, cls = '' }) {
   return html`<span class=${'plogo ' + cls} style=${`--c:${p.color}`}>${p.mono}</span>`;
@@ -53,7 +62,7 @@ function Found({ org, provider, vehicles, onFleetChange, toast }) {
     setBusy(true);
     let n = 0;
     for (const v of loose) {
-      try { await rpc('asset_save', { p_org: org.id, p: { unit_no: v.name || v.external_id, vin: v.vin || '', plate: v.plate || '', kind: 'truck' } }); n++; }
+      try { await rpc('asset_save', { p_org: org.id, p: fit(v) }); n++; }
       catch (x) { toast(`${v.name || v.external_id}: ${x.message}`, 'bad'); }
     }
     await reload();

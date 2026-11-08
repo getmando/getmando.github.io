@@ -15,5 +15,5 @@ window.APP_CONFIG = {
   OPERATOR: "",
   PRICING: "",
   TERMS_URL: "",
-  VERSION: "1.1.0",
+  VERSION: "1.1.1",
 };
