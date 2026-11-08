@@ -3,6 +3,17 @@ import { html, useState, Icon, Empty, Seg, Skel, Top, useLoad } from '../ui.js';
 import { useApp } from '../ctx.js';
 import { loadAudit } from '../data.js';
 import { fmtTime, dayLabel, dayKey, ago } from '../util.js';
+import { friendly } from '../parts/connect.js';
+
+// "Samsara stopped answering: Samsara HTTP 401 (GET /fleet/vehicles): Samsara did not accept…" (cut at 160 characters
+// by the database) → "Samsara connection failed: Samsara did not accept the API token." — the first plain sentence
+function plain(summary) {
+  const m = /^(.+?) stopped answering: ([\s\S]*)$/.exec(summary || '');
+  if (!m) return summary;
+  const main = friendly(m[2]).main;
+  const first = (/^[\s\S]*?[.!?](?=\s|$)/.exec(main) || [main])[0].trim();
+  return `${m[1]} connection failed: ${first}`;
+}
 
 const KIND = [
   [/^license\./, 'license', 'violet'], [/^member\./, 'users', 'blue'], [/^integration\.error/, 'alert', 'red'],
@@ -19,7 +30,7 @@ const GROUPS = {
 export function ActivityRow({ x, tz, full }) {
   const [, icon, tone] = KIND.find(([re]) => re.test(x.action)) || [null, 'activity', ''];
   return html`<div class="li"><span class=${'act-ic ' + tone}><${Icon} n=${icon} /></span>
-    <div class="grow"><div class="f-t">${x.summary}</div>
+    <div class="grow"><div class="f-t">${plain(x.summary)}</div>
       <div class="f-s">${full ? fmtTime(x.at, tz) : ago(x.at)}${x.actor_name && !x.summary.startsWith(x.actor_name) ? ` · ${x.actor_name}` : ''}</div></div></div>`;
 }
 

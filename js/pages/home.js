@@ -3,7 +3,7 @@
 import { html, useState, useEffect, useRef, Icon, Btn, Chip, Empty, Ring, Avatar, Skel, Top, useLoad, useTick } from '../ui.js';
 import { useApp, go } from '../ctx.js';
 import { loadAssets, loadDevices, loadMembers, loadIntegrations, loadAudit, byAsset } from '../data.js';
-import { greeting, firstName, fmtDate, ago, vstate, can, hasModule, plural } from '../util.js';
+import { greeting, firstName, fmtDate, ago, vstate, can, hasModule, plural, ensureLeaflet } from '../util.js';
 import { makeMap, pinIcon, fit } from '../maps.js';
 import { vehicleIcon, vehicleLine } from '../parts/asset.js';
 import { ActivityRow } from './activity.js';
@@ -14,11 +14,14 @@ export function MiniMap({ rows, theme, onPick }) {
   const el = useRef(null);
   const m = useRef(null);
   const fitted = useRef(false);
+  const [L, setL] = useState(window.L || null);                    // the map library loads only when a map is shown
+  useEffect(() => { if (!L) ensureLeaflet().then(setL).catch(() => {}); }, []);
   useEffect(() => {
-    if (!window.L || !el.current) return undefined;
+    if (!L || !el.current) return undefined;
     m.current = makeMap(el.current, { theme, zoomControl: false });
+    fitted.current = false;
     return () => { m.current?.destroy(); m.current = null; };
-  }, [theme]);
+  }, [theme, L]);
   useEffect(() => {
     if (!m.current) return;
     const { pins, map } = m.current;
@@ -28,11 +31,11 @@ export function MiniMap({ rows, theme, onPick }) {
       const d = r.state.dev;
       if (!d || d.last_lat == null) continue;
       pts.push([d.last_lat, d.last_lon]);
-      window.L.marker([d.last_lat, d.last_lon], { icon: pinIcon(r.label, r.state.key, { heading: d.last_heading }) })
+      L.marker([d.last_lat, d.last_lon], { icon: pinIcon(r.label, r.state.key, { heading: d.last_heading }) })
         .on('click', () => onPick && onPick(r)).addTo(pins);
     }
     if (pts.length && !fitted.current) { fit(map, pts, 13); fitted.current = true; }
-  }, [rows]);
+  }, [rows, theme, L]);
   return html`<div class="minimap" ref=${el}></div>`;
 }
 
@@ -59,6 +62,7 @@ export function Home() {
   const connected = (integ.data || []).filter((i) => i.status === 'connected').length;
   const broken = (integ.data || []).filter((i) => i.status === 'error').length;
   const seatsLeft = Math.max(0, (org.license?.seats || 0) - (org.seats_used || 0));
+  const invited = Math.max(0, (org.seats_used || 0) - people);       // open invitations hold seats too
 
   return html`<${Top} title=${`${greeting(org.timezone)}, ${firstName(me?.user?.name) || 'there'}`}
       sub=${`${fmtDate(Date.now(), org.timezone, { weekday: 'long', month: 'long', day: 'numeric' })} · ${org.name}`}>
@@ -83,7 +87,7 @@ export function Home() {
           <div class="t-v">${devices.data ? live.length : '–'}<small>/ ${withGps.length}</small></div><div class="t-s">${moving ? `${moving} moving` : withGps.length ? 'none moving' : 'no GPS yet'}</div>
           <${Icon} n="chevR" cls="t-go" /></a>` : null}
         <a class="tile" href="#/team"><div class="t-l"><${Icon} n="users" />Team</div>
-          <div class="t-v">${members.data ? people : '–'}</div><div class="t-s">${seatsLeft} seat${seatsLeft === 1 ? '' : 's'} left of ${org.license?.seats}</div>
+          <div class="t-v">${members.data ? people : '–'}</div><div class="t-s">${members.data && invited ? `${invited} invited · ` : ''}${seatsLeft} of ${org.license?.seats} seats free</div>
           <${Icon} n="chevR" cls="t-go" /></a>
         <a class="tile" href="#/integrations"><div class="t-l"><${Icon} n="plug" />Connections</div>
           <div class="t-v">${integ.data ? connected : '–'}</div><div class="t-s">${broken ? html`<span class="red">${broken} failing</span>` : connected ? 'all working' : 'connect your GPS'}</div>
@@ -106,7 +110,7 @@ export function Home() {
               : rows.length ? html`<div class="list" style="margin-top:8px">${rows.slice(0, 8).map((r) => html`<a class="li click" key=${r.id} href=${'#/fleet/' + r.id} style="color:inherit;text-decoration:none">
                   <div class="li-ic"><${Icon} n=${vehicleIcon(r.asset.kind)} /></div>
                   <div class="grow"><div class="li-t">${r.asset.unit_no} <span class="dim" style="font-weight:400">${vehicleLine(r.asset)}</span></div>
-                    <div class="li-s tr">${r.state.sub || (r.state.key === 'none' ? 'No GPS tied to it yet' : '')}</div></div>
+                    <div class="li-s tr">${r.state.sub || (r.state.key === 'none' ? 'No GPS linked yet' : '')}</div></div>
                   <${Chip} tone=${r.state.tone}>${r.state.label}<//></a>`)}</div>`
               : html`<${Empty} cls="sm" icon="truck" title="No vehicles yet" text="Add your trucks — a VIN fills in the rest.">
                   ${can(org.role, 'fleet') ? html`<${Btn} kind="primary" icon="plus" onClick=${() => go('fleet/new')}>Add vehicle<//>` : null}<//>`}</div>` : null}

@@ -338,7 +338,7 @@ html.motion .hero-net path{animation:dash 6s linear infinite}
 .pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .pcard{position:relative;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:var(--r);background:var(--card);border:1px solid var(--card-line);box-shadow:var(--card-shadow);cursor:pointer;text-align:left;color:inherit;transition:border-color .12s}
 .pcard:hover{border-color:var(--line2)}
-.pcard.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.pcard.picked{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
 .pcard .pc-top{display:flex;align-items:center;gap:10px}
 .plogo{width:38px;height:38px;flex:0 0 38px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;letter-spacing:-.02em;background:var(--c,#636366)}
 .plogo svg{width:20px;height:20px}
@@ -387,7 +387,7 @@ html.motion .done-check svg path{stroke-dasharray:40;stroke-dashoffset:40;animat
 .pin .p-d{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--gray-f)}
 .pin .p-d svg{width:11px;height:11px;color:#fff}
 .pin.moving .p-d{background:var(--green-f)}.pin.idle .p-d{background:var(--amber-f)}.pin.lost .p-d{background:var(--red-f)}.pin.stopped .p-d{background:#8E8E93}
-.pin.sel{outline:2.5px solid var(--accent);outline-offset:1px}
+.pin.picked{outline:2.5px solid var(--accent);outline-offset:1px}
 .leaflet-div-icon.pinwrap{background:none;border:0}
 .leaflet-popup-content-wrapper{border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:var(--pop-shadow)}
 .leaflet-popup-tip{background:var(--panel)}
@@ -489,7 +489,7 @@ html.motion .bigstate.on .bs-dot{animation:live 1.8s infinite}
 .issued-top{display:flex;gap:18px;align-items:flex-start}
 
 /* ---------- responsive ---------- */
-@media (max-width:1180px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.ptiles{grid-template-columns:repeat(3,minmax(0,1fr))}.home-grid{grid-template-columns:1fr}}
+@media (max-width:1180px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.ptiles{grid-template-columns:repeat(3,minmax(0,1fr))}.home-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:980px){
   .auth{grid-template-columns:1fr}.hero{display:none}.authmini{display:flex;align-items:center;gap:10px;justify-content:center}
   .shell{grid-template-columns:1fr}.rail{display:none}
@@ -511,7 +511,7 @@ html.motion .bigstate.on .bs-dot{animation:live 1.8s infinite}
   .grid3{grid-template-columns:1fr 1fr}
 }
 @media (max-width:640px){
-  .tiles{grid-template-columns:1fr 1fr;gap:10px}.tile{padding:12px}.tile .t-v{font-size:26px}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tile{padding:12px}.tile .t-v{font-size:26px}
   .ptiles{grid-template-columns:1fr 1fr}
   .grid2,.grid3{grid-template-columns:1fr}.span2{grid-column:span 1}
   .quick{grid-template-columns:1fr 1fr}.quick>:nth-child(2){grid-column:span 2;order:3}.quick>:last-child{grid-column:span 2;order:4}
@@ -530,4 +530,61 @@ html.motion .bigstate.on .bs-dot{animation:live 1.8s infinite}
 .minimap{isolation:isolate}
 .trail-line{stroke:var(--accent);fill:none;stroke-linecap:round;stroke-linejoin:round}
 .trail-start{stroke:var(--accent);fill:var(--panel)}
+
+/* ---------- v1.1 · first-run fixes (persona tests, Nov 8, 2026) ---------- */
+/* a field's problem: the message under it, the field outlined */
+.ferr{font-size:12.5px;line-height:1.4;color:var(--err-ink);font-weight:500}
+.field.bad .inp,.field.bad .sel,.field.bad .txt{border-color:var(--err-ink)}
+.field.bad .inp:focus,.field.bad .txt:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--err-ink) 18%,transparent)}
+/* sign-in pages: what Mando is (phones hide the left panel) and the links every first-time visitor looks for */
+.authblurb{display:none;font-size:13.5px;color:var(--dim);text-align:center;line-height:1.45}
+.authfoot{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12.5px;padding-top:12px;border-top:1px solid var(--line)}
+.authfoot a{color:var(--dim)}.authfoot a:hover{color:var(--ink)}
+.doclinks{font-size:12.5px;color:var(--dim);text-align:center;line-height:1.5}
+/* license card: what its words mean */
+.lic .l-notes{margin-top:12px;display:grid;gap:4px;font-size:12.5px;color:var(--dim);line-height:1.4}
+.lic .l-notes b{color:var(--ink2);font-weight:600}
+/* an invitation: the message exactly as the person gets it */
+.msgbox{white-space:pre-wrap;font-size:13px;line-height:1.5;padding:12px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink2);overflow-wrap:anywhere}
+/* a status line that wraps under its buttons on a phone instead of being crushed letter by letter */
+.st-text{flex:1 1 220px;min-width:0}.st-text b,.st-text div{overflow-wrap:anywhere}
+/* technical details behind a plain message */
+.more{font-size:12px;color:var(--dim)}.more summary{cursor:pointer;font-weight:600}.more summary:hover{color:var(--ink)}
+.more p{margin-top:6px;overflow-wrap:anywhere}
+/* About Mando and your data */
+.doc{min-height:100vh;background:var(--bg)}
+.doc-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:12px 24px;background:var(--glass);backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);border-bottom:1px solid var(--glass-line)}
+.doc-brand{color:var(--ink)}.doc-brand:hover{text-decoration:none}
+.doc-body{max-width:720px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:22px;font-size:15px;line-height:1.6;color:var(--ink2)}
+.doc-body h1{font-size:32px;letter-spacing:-.03em}
+.doc-body .lede{color:var(--dim);margin-top:-12px}
+.doc-body section{display:flex;flex-direction:column;gap:10px;scroll-margin-top:72px}
+.doc-body h2{font-size:21px;margin-top:8px}.doc-body h3{font-size:15px;margin-top:4px}
+.doc-body ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.doc-nav{display:flex;flex-wrap:wrap;gap:8px}
+.doc-nav a{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font-size:13px;font-weight:600}
+.doc-nav a:hover{border-color:var(--line2);text-decoration:none;color:var(--ink)}
+.doc-dl{display:grid;grid-template-columns:150px 1fr;gap:8px 16px;margin:0}
+.doc-dl dt{font-weight:700;color:var(--ink)}.doc-dl dd{margin:0}
+.doc-foot{display:flex;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+/* a caution that isn't an error (e.g. this person already has an invitation) */
+.warnmsg{display:flex;gap:8px;align-items:flex-start;background:var(--tint-amber);color:var(--tint-amber-ink);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45}
+.warnmsg svg{width:16px;height:16px;flex:0 0 16px;margin-top:1px}
+/* a company name of any length stays inside its card */
+.done-hero h1,.wel-hello h1,.wel-hello p,.wel-top b,.lic .l-name,.topbar h1,.topbar .sub{overflow-wrap:anywhere}
+/* quick truck row: a hint under the VIN no longer pushes the other boxes down */
+.quick{align-items:start}.quick>.field:last-child{padding-top:24px}
+@media (max-width:640px){.quick>.field:last-child{padding-top:0}}
+/* the selected vehicle on the Live map scrolls fully into view, above a phone's bottom bar */
+.live-sel{scroll-margin:12px 0 96px}
+/* GPS results: on a phone the link-to-vehicle choice goes under the truck's details instead of squeezing them */
+.found-sel{width:170px;height:32px}
+@media (max-width:640px){.found-list .li{flex-wrap:wrap}.found-list .li .grow{flex:1 1 180px}.found-sel{width:100%}}
+/* the boot screen's words (index.html inlines the rest, so it shows before this file arrives) */
+.boot-msg{margin-top:14px;font-size:13px;color:var(--dim);text-align:center}
+/* a side panel leaves the left menu working on desktop: one click there goes where it says */
+@media (min-width:981px){.shell .scrim{left:var(--rail-w)}}
+@media (max-width:980px){.authblurb{display:block}}
+@media (max-width:640px){.doc-dl{grid-template-columns:1fr;gap:2px}.doc-dl dd{margin-bottom:8px}.doc-body{padding:22px 16px 48px}.doc-top{padding:10px 16px}.doc-body h1{font-size:26px}}
+
 html:not(.motion) *{animation:none!important;transition:none!important}

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mando</title>
+<script>
+// GitHub Pages answers every unknown address with this page. Mando's pages live after the "#" (#/privacy), so an
+// address typed without it (/privacy, /terms, /pricing) opens that page in the app instead of a dead end.
+(function () {
+  var p = location.pathname.replace(/^\/+|\/+$/g, '');
+  location.replace('/' + (location.hash ? location.hash : p ? '#/' + p : ''));
+})();
+</script>
+</head>
+<body style="font-family:system-ui,sans-serif;padding:24px">
+<p>Opening Mando… If nothing happens, <a href="/">open Mando's home page</a>.</p>
+</body>
+</html>

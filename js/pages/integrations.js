@@ -9,7 +9,7 @@ import { ProviderConnect, ProviderLogo, statusOf } from '../parts/connect.js';
 
 const BUILTIN = {
   driver: { key: 'driver', name: 'Driver app', mono: '', color: '#34C759', icon: 'phone', blurb: 'Drivers\' phones as GPS trackers. No hardware — they pick the truck they\'re in and tap Start.' },
-  api: { key: 'api', name: 'Open API', mono: '', color: '#5E5CE6', icon: 'code', blurb: 'Send positions from any system — a dispatch board, another GPS, your own app — with your company\'s key.' },
+  api: { key: 'api', name: 'Open API', mono: '', color: '#5E5CE6', icon: 'code', blurb: 'For software people: your other systems (a dispatch board, another GPS, your own app) send truck positions with your company\'s key.' },
 };
 
 function Logo({ p }) {
@@ -113,17 +113,17 @@ export function Integrations() {
   const close = () => go('integrations');
 
   const card = (p, status) => html`<button type="button" class="icard" key=${p.key} onClick=${() => go('integrations/' + p.key)}>
-    <div class="ic-top"><${Logo} p=${p} /><div class="grow"><div class="ic-n">${p.name}</div><div class="ic-c">${p.cat === 'gps' ? 'GPS & telematics' : p.soon ? 'Coming next' : 'Built in'}</div></div>
+    <div class="ic-top"><${Logo} p=${p} /><div class="grow"><div class="ic-n">${p.name}</div><div class="ic-c">${p.cat === 'gps' ? 'GPS trackers' : p.soon ? 'Coming next' : 'Built in'}</div></div>
       ${p.beta ? html`<${Chip}>Beta<//>` : null}</div>
     <div class="ic-d">${p.blurb}</div>
     <div class="ic-f">${status}</div></button>`;
 
-  return html`<${Top} title="Integrations" sub="Connect the systems your company already uses. Your accounts, your credentials, your data." />
+  return html`<${Top} title="Connections" sub="Connect your GPS and the other systems your company already uses — with your own accounts and logins." />
     <div class="page">
-      ${hasModule(org, 'map') ? html`<div class="section"><h4>GPS & telematics</h4>
+      ${hasModule(org, 'map') ? html`<div class="section"><h4>GPS trackers</h4>
         ${!integ.data ? html`<${Skel} h=${150} />` : html`<div class="igrid">${gps.map((p) => {
           const st = statusOf(rowOf(p.key));
-          return card(p, html`<span class=${'dot ' + st.tone + (rowOf(p.key)?.status === 'connected' ? ' live' : '')}></span><span class="grow tr">${st.label}${st.sub && rowOf(p.key)?.status === 'connected' ? ' · ' + st.sub : ''}</span>
+          return card(p, html`<span class=${'dot ' + st.tone + (rowOf(p.key)?.status === 'connected' ? ' live' : '')}></span><span class="grow">${st.label}${st.sub && rowOf(p.key)?.status === 'connected' ? ' · ' + st.sub : ''}</span>
             ${manage ? html`<${Icon} n="chevR" size="16" />` : null}`);
         })}</div>`}</div>` : null}
       ${builtin.length ? html`<div class="section"><h4>Built in</h4><div class="igrid">${builtin.map((p) => card(p, html`<${Chip} tone="green" icon="check">Included in your license<//>`))}</div></div>` : null}

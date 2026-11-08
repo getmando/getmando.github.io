@@ -93,6 +93,7 @@ export function Driver() {
             ${truck === 'none' ? html`<${Icon} n="check" />` : null}</button></div>`
           : html`<div class="card"><${Empty} cls="sm" icon="truck" text="No vehicles yet — ask your dispatcher to add the trucks." /></div>`}
       </div>
-      <p class="dim sm">Keep this screen open while you drive — it stays on while sharing. ${org.name} sees your position only while this says Sharing.</p>
+      <p class="dim sm">Keep this screen open while you drive — it stays on while sharing. ${org.name} sees your position only while this says Sharing:
+        it's sent every 15 seconds, seen by the people at ${org.name} who use the live map, and kept 180 days. <a href="#/about/drivers">More about this</a></p>
     </div></div>`;
 }

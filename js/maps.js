@@ -40,7 +40,7 @@ export function pinIcon(label, state, { heading = null, selected = false } = {})
     ? `<span style="display:grid;transform:rotate(${Math.round(heading)}deg)">${ARROW}</span>` : DOT;
   return window.L.divIcon({
     className: 'pinwrap',
-    html: `<div class="pin ${state}${selected ? ' sel' : ''}"><span class="p-d">${glyph}</span>${esc(label)}</div>`,
+    html: `<div class="pin ${state}${selected ? ' picked' : ''}"><span class="p-d">${glyph}</span>${esc(label)}</div>`,
     iconSize: [0, 0],
   });
 }

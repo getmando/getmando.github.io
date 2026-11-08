@@ -21,11 +21,11 @@ function VehicleDrawer({ org, asset, devices, onClose, onChanged }) {
   const state = vstate(mine);
   const manage = can(org.role, 'fleet');
   const tie = async (devId, assetId) => {
-    try { await rpc('device_link', { p_device: devId, p_asset: assetId }); onChanged(); app.toast(assetId ? 'GPS tied to ' + asset.unit_no : 'GPS untied'); }
+    try { await rpc('device_link', { p_device: devId, p_asset: assetId }); onChanged(); app.toast(assetId ? 'GPS linked to ' + asset.unit_no : 'GPS unlinked'); }
     catch (x) { app.toast(x.message, 'bad'); }
   };
   const remove = async () => {
-    if (!(await app.confirm({ title: `Delete ${asset.unit_no}?`, text: 'Its GPS units stay (untied) and its past positions are kept. This can\'t be undone.', ok: 'Delete', danger: true }))) return;
+    if (!(await app.confirm({ title: `Delete ${asset.unit_no}?`, text: 'Its GPS units stay (not linked to anything) and its past positions are kept. This can\'t be undone.', ok: 'Delete', danger: true }))) return;
     try { await rpc('asset_remove', { p_asset: asset.id }); app.toast(`${asset.unit_no} deleted`); onChanged(); onClose(); }
     catch (x) { app.toast(x.message, 'bad'); }
   };
@@ -54,11 +54,13 @@ function VehicleDrawer({ org, asset, devices, onClose, onChanged }) {
       <dt>Added</dt><dd>${fmtDate(asset.created_at, org.timezone)}</dd></dl></div>
     <div class="section"><h4>GPS</h4>
       ${mine.length ? html`<div class="card"><div class="list">${mine.map((d) => html`<div class="li" key=${d.id}><div class="li-ic"><${Icon} n=${d.source === 'phone' ? 'phone' : 'signal'} /></div>
-          <div class="grow"><div class="li-t">${d.name || d.external_id}</div><div class="li-s">${sourceName(d.source)} · ${d.last_at ? 'last seen ' + ago(d.last_at) : 'no position yet'}${d.link_source ? ` · tied ${d.link_source === 'manual' ? 'by hand' : d.link_source === 'driver' ? 'by the driver' : 'by ' + d.link_source}` : ''}</div></div>
-          ${manage && d.source !== 'phone' ? html`<${Btn} size="sm" kind="ghost" onClick=${() => tie(d.id, null)}>Untie<//>` : null}</div>`)}</div></div>`
-        : html`<p class="dim sm">No GPS is tied to ${asset.unit_no}. A connected provider ties itself by VIN, plate or name; you can also tie one by hand.</p>`}
+          <div class="grow"><div class="li-t">${d.name || d.external_id}</div><div class="li-s">${sourceName(d.source)} · ${d.last_at ? 'last seen ' + ago(d.last_at) : 'no position yet'}${d.link_source ? ` · linked ${d.link_source === 'manual' ? 'by hand' : d.link_source === 'driver' ? 'by the driver' : d.link_source === 'vin' ? 'by VIN' : 'by ' + d.link_source}` : ''}</div></div>
+          ${manage && d.source !== 'phone' ? html`<${Btn} size="sm" kind="ghost" onClick=${() => tie(d.id, null)}>Unlink<//>` : null}</div>`)}</div></div>`
+        : html`<p class="dim sm">No GPS is linked to ${asset.unit_no}. ${manage && loose.length
+            ? 'A connected GPS links itself by VIN, plate or name — or pick one of its units below.'
+            : html`When you connect your GPS (${manage ? html`<a href="#/integrations">Connections</a>` : 'Connections'}), it finds this truck by VIN, plate or name.`}</p>`}
       ${manage && loose.length ? html`<div class="row"><select class="sel" style="max-width:320px" onChange=${(e) => e.target.value && tie(e.target.value, asset.id)}>
-          <option value="">Tie a GPS unit to ${asset.unit_no}…</option>${loose.map((d) => html`<option value=${d.id}>${d.name || d.external_id} · ${sourceName(d.source)}</option>`)}</select></div>` : null}
+          <option value="">Link a GPS unit to ${asset.unit_no}…</option>${loose.map((d) => html`<option value=${d.id}>${d.name || d.external_id} · ${sourceName(d.source)}</option>`)}</select></div>` : null}
     </div>
   <//>`;
 }

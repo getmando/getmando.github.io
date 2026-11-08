@@ -1,6 +1,35 @@
 // Shared helpers: names, time, roles, modules, providers, vehicle state, VIN, QR, clipboard, links.
 export const C = window.APP_CONFIG || {};
 export const BRAND = C.BRAND || 'Mando';
+// who to ask about the license, the price or a lost owner password: the support address once config.js has one,
+// otherwise the person who sent the license (the invitation email came from them) — never an unnamed "provider"
+export const askWho = () => C.SUPPORT_EMAIL || 'the person who sent you your license';
+// a phone-sized touch screen (Text it only makes sense there)
+export const isPhone = () => !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+
+// ---------- scripts a screen loads only when it needs them (maps, QR codes), so the first page opens faster ----------
+const loaded = {};
+export function loadScript(src) {
+  if (!loaded[src]) {
+    loaded[src] = new Promise((ok, bad) => {
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = ok;
+      s.onerror = () => { delete loaded[src]; bad(new Error('Could not load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  return loaded[src];
+}
+export function ensureLeaflet() {
+  if (window.L) return Promise.resolve(window.L);
+  if (!document.querySelector('link[data-leaflet]')) {             // before app.css, so app.css still wins as before
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = './vendor/leaflet/leaflet.css'; l.dataset.leaflet = '1';
+    document.head.insertBefore(l, document.querySelector('link[href="./app.css"]'));
+  }
+  return loadScript('./vendor/leaflet/leaflet.js').then(() => window.L);
+}
 
 export function initials(name) {
   const w = String(name || '').replace(/[^A-Za-z0-9 &-]/g, ' ').split(/[\s-]+/).filter(Boolean);
@@ -68,7 +97,7 @@ export const ROLES = {
   owner:      { name: 'Owner',      desc: 'Everything, including the license and who owns the company.' },
   admin:      { name: 'Admin',      desc: 'Team, settings, integrations and the fleet.' },
   dispatcher: { name: 'Dispatcher', desc: 'Runs the fleet and the live map. No team or settings.' },
-  driver:     { name: 'Driver',     desc: 'Shares the phone\'s location while driving; sees the fleet.' },
+  driver:     { name: 'Driver',     desc: 'Uses Driver mode: the phone shares its location only while it says Sharing, and they can stop any time. Sees the fleet.' },
   viewer:     { name: 'Viewer',     desc: 'Sees everything, changes nothing. Good for accounting.' },
 };
 const PERMS = {
@@ -77,10 +106,10 @@ const PERMS = {
 };
 export const can = (role, perm) => (PERMS[perm] || []).includes(role);
 export const MODULES = {
-  fleet:  { name: 'Fleet', desc: 'Trucks, trailers and equipment' },
-  map:    { name: 'Live map & GPS', desc: 'Connect GPS providers, see every vehicle live' },
-  driver: { name: 'Driver app', desc: 'Drivers\' phones as GPS — no hardware' },
-  api:    { name: 'Open API', desc: 'Send positions from any system' },
+  fleet:  { name: 'Fleet', desc: 'Your trucks, trailers and equipment' },
+  map:    { name: 'Live map & GPS', desc: 'See every vehicle on a map, from the GPS you already use' },
+  driver: { name: 'Driver app', desc: 'Drivers\' phones work as GPS — no tracker needed' },
+  api:    { name: 'Open API', desc: 'Your other software can send truck positions' },
 };
 export const COMING = {
   orders:  { name: 'Orders', desc: 'Vendors see purchase orders here instead of email' },
@@ -99,23 +128,23 @@ export const ASSET_STATUS = { active: ['Active', 'green'], shop: ['In the shop',
 
 // GPS & other providers. `fields`: what the company types (secret ones go to Vault); `steps`: where to find them.
 export const PROVIDERS = [
-  { key: 'samsara', name: 'Samsara', cat: 'gps', color: '#0B2A4A', mono: 'S', blurb: 'Vehicle gateways and ELDs. Live location, speed, engine state and street address.',
+  { key: 'samsara', name: 'Samsara', cat: 'gps', color: '#0B2A4A', mono: 'S', blurb: 'Samsara trackers and ELDs: live location, speed, engine on or off and street address.',
     fields: [
       { key: 'api_token', label: 'API token', secret: true, placeholder: 'samsara_api_…' },
-      { key: 'region', label: 'Where you sign in to Samsara', options: [['us', 'cloud.samsara.com (United States)'], ['eu', 'cloud.eu.samsara.com (Europe)'], ['ca', 'cloud.ca.samsara.com (Canada)']] },
+      { key: 'region', label: 'Where you sign in to Samsara', options: [['us', 'US · cloud.samsara.com'], ['eu', 'Europe · cloud.eu.samsara.com'], ['ca', 'Canada · cloud.ca.samsara.com']] },
     ],
     steps: ['In Samsara, click the gear icon (Settings) at the bottom of the left menu, scroll to API Tokens and click "Add an API Token".',
-      'Name it after this app and leave Tag Access on the whole organization.',
-      'Under Granular Scopes give it read access only: "Read Vehicles" and "Read Vehicle Statistics".',
+      `Give it a name, for example "${BRAND}". Leave "Tag Access" (which vehicles the token can see) on the whole organization.`,
+      'Under "Granular Scopes" (what the token is allowed to do) choose read only: "Read Vehicles" and "Read Vehicle Statistics".',
       'Copy the token right away — Samsara shows it only once — and paste it here.'] },
-  { key: 'motive', name: 'Motive', cat: 'gps', color: '#111827', mono: 'M', blurb: 'Formerly KeepTruckin. ELDs and vehicle gateways with live locations.',
+  { key: 'motive', name: 'Motive', cat: 'gps', color: '#111827', mono: 'M', blurb: 'Motive (formerly KeepTruckin) ELDs and trackers with live locations.',
     fields: [
       { key: 'api_key', label: 'API key', secret: true },
       { key: 'region', label: 'Motive platform', options: [['us', 'United States'], ['eu', 'Europe']] },
     ],
     steps: ['Sign in to the Motive Dashboard as a fleet admin.', 'Click the admin icon at the bottom of the left menu, scroll to Developers and click "Create an API Key" (some accounts show "Request API Key").',
       'Name it, save, and copy the key here.'] },
-  { key: 'geotab', name: 'Geotab', cat: 'gps', color: '#1F4E8C', mono: 'G', blurb: 'MyGeotab GO devices. Positions, speed, ignition and street address.',
+  { key: 'geotab', name: 'Geotab', cat: 'gps', color: '#1F4E8C', mono: 'G', blurb: 'MyGeotab GO devices: location, speed, engine on or off and street address.',
     fields: [
       { key: 'database', label: 'Database name', placeholder: 'acme_paving' },
       { key: 'username', label: 'User name', placeholder: 'api-user@yourcompany.com' },
@@ -125,7 +154,7 @@ export const PROVIDERS = [
     steps: ['In MyGeotab go to People → Users & Drivers → Add. Set Authentication type to "Service Account" and the security clearance to "View only", so it can read but never change anything.',
       'Your database name is in the address bar right after the server: my.geotab.com/acme_paving/ → acme_paving.',
       'Enter that user and its password. Leave Server empty unless you sign in to MyGeotab at a different address.'] },
-  { key: 'verizon', name: 'Verizon Connect', cat: 'gps', color: '#CD040B', mono: 'V', beta: true, blurb: 'Reveal fleet tracking through Verizon\'s REST API.',
+  { key: 'verizon', name: 'Verizon Connect', cat: 'gps', color: '#CD040B', mono: 'V', beta: true, blurb: 'Verizon Connect Reveal trackers: live location and speed.',
     fields: [
       { key: 'username', label: 'REST integration user name' },
       { key: 'password', label: 'REST integration password', secret: true },
@@ -135,7 +164,7 @@ export const PROVIDERS = [
     steps: ['Ask Verizon Connect Customer Care for "REST API integration credentials" for your Reveal account — they are not your normal Reveal login.',
       'Get your App ID from the Verizon Connect Developer Portal (fim.us.fleetmatics.com): profile icon → My Apps → your app → Details.',
       'In Reveal, make sure every vehicle has a Vehicle Number — Verizon finds vehicles by that number.'] },
-  { key: 'actsoft', name: 'Actsoft', cat: 'gps', color: '#0E7C66', mono: 'A', blurb: 'Actsoft Workforce Manager GPS trackers. Every point since the last sync.',
+  { key: 'actsoft', name: 'Actsoft', cat: 'gps', color: '#0E7C66', mono: 'A', blurb: 'Actsoft Workforce Manager GPS trackers: every point since the last check.',
     fields: [{ key: 'api_key', label: 'API subscription key', secret: true }],
     steps: ['Ask Actsoft support for developer API access for your account.', 'Copy your API subscription key (Ocp-Apim-Subscription-Key) and paste it here.'] },
   { key: 'fleetio', name: 'Fleetio', cat: 'fleet', color: '#1F8A70', mono: 'F', blurb: 'Fleet maintenance records: import vehicles, plates, VINs and odometers.', soon: true },
@@ -152,7 +181,11 @@ export function vstate(devs) {
   const min = (Date.now() - new Date(d.last_at).getTime()) / 60000;
   if (min > 60) return { key: 'lost', label: 'No signal', tone: 'red', dev: d, sub: `Last seen ${ago(d.last_at)}` };
   const mph = Number(d.last_speed_mph || 0);
-  if (mph > 3) return { key: 'moving', label: `Moving · ${Math.round(mph)} mph`, tone: 'green', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
+  // GPS reports about every minute: a truck last heard moving more than 5 minutes ago isn't "Moving" right now —
+  // say so instead of sounding live (the age itself is shown next to the state wherever it appears)
+  if (mph > 3) return min >= 5
+    ? { key: 'moving', label: 'Last seen moving', tone: 'amber', dev: d, sub: [d.last_address, `seen ${ago(d.last_at)}`].filter(Boolean).join(' · ') }
+    : { key: 'moving', label: `Moving · ${Math.round(mph)} mph`, tone: 'green', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
   if (d.last_ignition) return { key: 'idle', label: 'Idling', tone: 'amber', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
   return { key: 'stopped', label: 'Stopped', tone: 'blue', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
 }
@@ -205,5 +238,10 @@ export function qrSvg(text) {
   q.make();
   return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
 }
-export const smsLink = (body) => `sms:?&body=${encodeURIComponent(body)}`;
+// a text message with the body filled in, to `phone` when there is one (US numbers get +1)
+export function smsLink(body, phone) {
+  const d = String(phone || '').replace(/[^\d+]/g, '');
+  const to = !d ? '' : d.startsWith('+') ? d : d.length === 10 ? '+1' + d : d.length === 11 && d[0] === '1' ? '+' + d : d;
+  return `sms:${to}?&body=${encodeURIComponent(body)}`;
+}
 export const mailLink = (to, subject, body) => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

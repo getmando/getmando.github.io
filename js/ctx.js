@@ -11,7 +11,10 @@ export function parseRoute() {
   const parts = path.split('/').filter(Boolean);
   return { name: parts[0] || '', params: parts.slice(1), query: new URLSearchParams(q || '') };
 }
-export const go = (r) => {
+// { replace: true } swaps the current entry instead of adding one (Back then skips a page that's done, like the
+// activation form once the account exists)
+export const go = (r, { replace = false } = {}) => {
   const to = '#/' + String(r).replace(/^#?\/?/, '');
-  if (location.hash !== to) location.hash = to;
+  if (location.hash === to) return;
+  if (replace) location.replace(to); else location.hash = to;
 };

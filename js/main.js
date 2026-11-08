@@ -3,8 +3,9 @@
 import { html, render, useState, useEffect, Icon, Mark, OrgBadge, Avatar, Btn, Modal, Drawer, Empty } from './ui.js';
 import { Ctx, useApp, parseRoute, go } from './ctx.js';
 import { configured, getSession, onSession, rpc, signOut } from './api.js';
-import { BRAND, C, can, hasModule, ROLES, KINDS } from './util.js';
+import { BRAND, C, can, hasModule, ROLES, KINDS, askWho } from './util.js';
 import { SignIn, Activate, Join, Reset } from './pages/auth.js';
+import { About } from './pages/about.js';
 import { Welcome } from './pages/welcome.js';
 import { Home } from './pages/home.js';
 import { LiveMap } from './pages/map.js';
@@ -22,13 +23,13 @@ const NAV = [
   { r: 'map', label: 'Live map', icon: 'map', mod: 'map' },
   { r: 'fleet', label: 'Fleet', icon: 'truck', mod: 'fleet' },
   { r: 'team', label: 'Team', icon: 'users' },
-  { r: 'integrations', label: 'Integrations', icon: 'plug' },
+  { r: 'integrations', label: 'Connections', icon: 'plug' },
   { r: 'activity', label: 'Activity', icon: 'activity' },
   { r: 'settings', label: 'Settings', icon: 'settings' },
   { r: 'driver', label: 'Driver mode', icon: 'nav', mod: 'driver', perm: 'drive' },
 ];
 const PAGES = { home: Home, map: LiveMap, fleet: Fleet, driver: Driver, team: Team, integrations: Integrations, activity: Activity, settings: Settings };
-const PUBLIC = { signin: SignIn, activate: Activate, join: Join, reset: Reset };
+const PUBLIC = { signin: SignIn, activate: Activate, join: Join, reset: Reset, about: About, pricing: About, terms: About, privacy: About };
 
 function navFor(org) {
   if (!org) return [];
@@ -131,7 +132,7 @@ function Shell({ active, children }) {
           <div class="m-e tr">${me?.user?.email}</div></div>
           <${Btn} kind="ghost" size="sm" cls="icon" icon=${theme === 'dark' ? 'sun' : 'moon'} aria-label="Light or dark" onClick=${flipTheme} /></div>
         <button type="button" class="nav" onClick=${() => signOut()}><${Icon} n="logout" />Sign out</button>
-        ${org ? html`<div class="powered"><${Mark} />Powered by ${BRAND}</div>` : null}
+        ${org ? html`<a class="powered" href="#/about" title=${`About ${BRAND} and your data`}><${Mark} />Powered by ${BRAND}</a>` : null}
       </div>
     </aside>
     <div class="main">
@@ -150,6 +151,7 @@ function Shell({ active, children }) {
         <${Icon} n=${n.icon} />${n.label}</a>`)}
         ${me?.platform_admin ? html`<a class=${'nav' + (active === 'platform' ? ' on' : '')} href="#/platform" onClick=${() => setMore(false)}><${Icon} n="license" />License desk</a>` : null}
         ${orgs.length > 1 ? html`<button type="button" class="nav" onClick=${() => { setMore(false); setSwitching(true); }}><${Icon} n="swap" />Switch company</button>` : null}
+        <a class="nav" href="#/about" onClick=${() => setMore(false)}><${Icon} n="shield" />About ${BRAND} and your data</a>
         <button type="button" class="nav" onClick=${() => signOut()}><${Icon} n="logout" />Sign out</button></div>
       <//>` : null}
     ${switching ? html`<${OrgSwitch} onClose=${() => setSwitching(false)} />` : null}
@@ -170,7 +172,7 @@ function Locked() {
   const why = { suspended: 'is suspended', revoked: 'was cancelled', expired: 'expired', disabled: 'is turned off for you', no_license: 'is missing' }[org.lock] || 'is not active';
   return html`<div class="page"><div class="card"><${Empty} icon="lock" title=${org.lock === 'disabled' ? 'Your access is turned off' : `${org.name}'s license ${why}`}
     text=${org.lock === 'disabled' ? `An owner or admin of ${org.name} turned off your access. Ask them to turn it back on.`
-      : `Nothing was deleted — everything comes back when the license is active again. ${C.SUPPORT_EMAIL ? 'Contact ' + C.SUPPORT_EMAIL + '.' : 'Contact your provider.'}`}>
+      : `Nothing was deleted — everything comes back when the license is active again. To renew it, write to ${askWho()}.`}>
     ${orgs.length > 1 ? html`<${Btn} icon="swap" onClick=${() => document.querySelector('.rail-org')?.click()}>Switch company<//>` : null}
     <${Btn} icon="logout" onClick=${() => signOut()}>Sign out<//><//></div></div>`;
 }

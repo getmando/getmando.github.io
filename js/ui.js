@@ -3,7 +3,7 @@
 import { h, render, Fragment, createContext } from 'preact';
 import { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { initials, hashColor, copy, qrSvg } from './util.js';
+import { initials, hashColor, copy, qrSvg, loadScript } from './util.js';
 import { publicUrl } from './api.js';
 
 export const html = htm.bind(h);
@@ -42,6 +42,7 @@ const I = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5"/>',
   moon: '<path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/>',
   upload: '<path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9"/><path d="M4.5 15v3.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V15"/>',
+  download: '<path d="M12 4.5v11M7.5 11 12 15.5 16.5 11"/><path d="M4.5 15v3.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V15"/>',
   trash: '<path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.9 12.2a1 1 0 0 0 1 .9h7.2a1 1 0 0 0 1-.9L17.5 7"/>',
   edit: '<path d="M4.5 19.5h4l10-10-4-4-10 10z"/><path d="m13 7 4 4"/>',
   refresh: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
@@ -96,19 +97,21 @@ export function Chip({ tone = '', icon, children, cls = '' }) {
   return html`<span class=${`chip ${tone} ${cls}`}>${icon ? html`<${Icon} n=${icon} />` : null}${children}</span>`;
 }
 
-export function Field({ label, help, children, cls = '', id }) {
-  return html`<div class=${'field ' + cls}>${label ? html`<label for=${id}>${label}</label>` : null}${children}${help ? html`<div class="help">${help}</div>` : null}</div>`;
+// a labelled field; `error` (a plain sentence: what's wrong and what to type) replaces the help line and outlines it
+export function Field({ label, help, error, children, cls = '', id }) {
+  return html`<div class=${'field ' + cls + (error ? ' bad' : '')}>${label ? html`<label for=${id}>${label}</label>` : null}${children}${error
+    ? html`<div class="ferr" role="alert">${error}</div>` : help ? html`<div class="help">${help}</div>` : null}</div>`;
 }
 
-export function Password({ value, onInput, placeholder = '', auto = 'new-password', meter = false, id }) {
+export function Password({ value, onInput, placeholder = '', auto = 'new-password', meter = false, id, err = false }) {
   const [show, setShow] = useState(false);
   const s = !value ? 0 : value.length < 10 ? 1 : (/[a-z]/.test(value) + /[A-Z]/.test(value) + /\d/.test(value) + /[^A-Za-z0-9]/.test(value) + (value.length >= 14)) >= 3 ? 4 : 3;
   return html`<div class="col">
     <div class="inwrap"><input id=${id} class="inp" type=${show ? 'text' : 'password'} value=${value} placeholder=${placeholder} autocomplete=${auto}
       onInput=${(e) => onInput(e.target.value)} />
       <button type="button" class="in-act" onClick=${() => setShow(!show)} aria-label=${show ? 'Hide password' : 'Show password'}>${show ? 'Hide' : 'Show'}</button></div>
-    ${meter ? html`<div class=${'strength s' + s}><i></i><i></i><i></i><i></i></div>
-      <div class="help">${s === 0 ? 'At least 10 characters.' : s === 1 ? `${10 - value.length} more character${10 - value.length === 1 ? '' : 's'}.` : s === 3 ? 'Good. Mix in capitals, numbers or symbols to make it stronger.' : 'Strong password.'}</div>` : null}
+    ${meter ? html`<div class=${'strength s' + s}><i></i><i></i><i></i><i></i></div>` : null}
+    ${meter && !err ? html`<div class="help">${s === 0 ? 'At least 10 characters.' : s === 1 ? `${10 - value.length} more character${10 - value.length === 1 ? '' : 's'}.` : s === 3 ? 'Good. Mix in capitals, numbers or symbols to make it stronger.' : 'Strong password.'}</div>` : null}
   </div>`;
 }
 
@@ -135,8 +138,11 @@ export function Ring({ value, max, size = 64 }) {
       stroke-dasharray=${`${c * f} ${c}`} /></svg><div class="rv">${value}/${max}</div></div>`;
 }
 
+// the QR library loads only when a code is shown (it isn't needed to open the app)
 export function Qr({ text }) {
-  return html`<div class="qr" dangerouslySetInnerHTML=${{ __html: qrSvg(text) }}></div>`;
+  const [ready, setReady] = useState(!!window.qrcode);
+  useEffect(() => { if (!ready) loadScript('./vendor/qrcode.js').then(() => setReady(true)).catch(() => {}); }, []);
+  return html`<div class="qr" dangerouslySetInnerHTML=${{ __html: ready ? qrSvg(text) : '' }}></div>`;
 }
 
 export function CopyLine({ value, toast, label = 'Copy' }) {

@@ -20,7 +20,8 @@ function KeyResult({ lic, code, activateBy, toast }) {
   const link = appLink(`/activate/${code}`);
   const message = `Hi${lic.contact_name ? ' ' + firstName(lic.contact_name) : ''} — your ${BRAND} license for ${lic.company_name} is ready.\n\n`
     + `Open this link to create your account and set up ${lic.company_name}'s command center:\n${link}\n\n`
-    + `Your license key: ${code}\nActivate by ${fmtDate(activateBy)}.`;
+    + `Your license key: ${code}\nThe link works until ${fmtDate(activateBy)}.\n\n`
+    + `What it costs, the terms and how your data is kept: ${appLink('/about')}\nQuestions? Just reply to this message.`;
   const copyMsg = async () => { const ok = await copy(message); toast(ok ? 'Invitation copied — paste it in an email or text' : 'Select it and copy it by hand', ok ? 'ok' : 'bad'); };
   return html`<div class="issued">
     <div class="okmsg"><${Icon} n="check" /><div><b>License issued.</b> The key is shown only now — send it before you close this. If it gets lost before activation, make a new key from the license.</div></div>

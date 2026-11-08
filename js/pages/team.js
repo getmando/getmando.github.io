@@ -4,7 +4,7 @@ import { html, useState, Icon, Btn, Chip, Empty, Drawer, Avatar, Skel, Top, useL
 import { useApp, go } from '../ctx.js';
 import { rpc } from '../api.js';
 import { loadMembers, loadInvites } from '../data.js';
-import { BRAND, ROLES, ago, can, fmtDate, phoneFmt, appLink } from '../util.js';
+import { BRAND, ROLES, ago, can, fmtDate, phoneFmt, appLink, askWho } from '../util.js';
 import { InviteForm, ShareBox, article } from '../parts/invite.js';
 
 function ResetLink({ org, person, data, onClose, toast }) {
@@ -72,7 +72,7 @@ export function Team() {
       ${manage ? html`<${Btn} kind="primary" icon="plus" onClick=${() => go('team/invite')}>Invite people<//>` : null}<//>
     <div class="page">
       <div class="card pad"><div class="seats"><div class="col" style="gap:2px"><b>${used} of ${seats} seats in use</b>
-          <span class="dim xs">People plus open invitations. ${seats - used <= 0 ? 'Need more? Contact your provider.' : ''}</span></div>
+          <span class="dim xs">Each person, and each invitation not used yet, uses one seat. ${seats - used <= 0 ? `Need more? Write to ${askWho()}.` : ''}</span></div>
         <div class="meter"><i style=${`width:${Math.min(100, (used / Math.max(1, seats)) * 100)}%`}></i></div></div></div>
 
       <div class="card tablecard"><div class="card-h"><h3>People</h3></div>

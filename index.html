@@ -10,18 +10,56 @@
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="manifest" href="./manifest.webmanifest">
 <script>try{var d=document.documentElement,s=localStorage.getItem("mando.theme"),t=s==="light"||s==="dark"?s:(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");d.setAttribute("data-theme",t);document.querySelector('meta[name="theme-color"]').content=t==="light"?"#F5F5F7":"#000000";if(!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("motion")}catch(e){document.documentElement.setAttribute("data-theme","light")}</script>
+<!-- the loading screen draws from here, before any file arrives (a phone on a weak signal sees it at once) -->
+<style>
+html,body{margin:0;background:#F5F5F7}html[data-theme="dark"],html[data-theme="dark"] body{background:#000}
+.boot{min-height:100vh;display:grid;place-items:center;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#6E6E73}
+html[data-theme="dark"] .boot{color:#98989D}
+.boot-in{display:grid;justify-items:center;gap:14px}
+.boot-mark{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#2F6BFF,#6E44FF)}
+html.motion .boot-mark{animation:bootpulse 1.2s ease-in-out infinite}
+@keyframes bootpulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(.92);opacity:.6}}
+</style>
+<!-- the font never holds the page back: text shows in the phone's own font until Inter arrives -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="./vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="./app.css">
 <script type="importmap">{"imports":{"preact":"./vendor/preact.module.js","preact/hooks":"./vendor/hooks.module.js","htm":"./vendor/htm.module.js"}}</script>
+<!-- every module is asked for at once instead of one wave of imports at a time (each wave costs a round trip) -->
+<link rel="modulepreload" href="./js/main.js">
+<link rel="modulepreload" href="./vendor/preact.module.js">
+<link rel="modulepreload" href="./vendor/hooks.module.js">
+<link rel="modulepreload" href="./vendor/htm.module.js">
+<link rel="modulepreload" href="./js/ui.js">
+<link rel="modulepreload" href="./js/util.js">
+<link rel="modulepreload" href="./js/api.js">
+<link rel="modulepreload" href="./js/ctx.js">
+<link rel="modulepreload" href="./js/data.js">
+<link rel="modulepreload" href="./js/maps.js">
+<link rel="modulepreload" href="./js/check.js">
+<link rel="modulepreload" href="./js/pages/auth.js">
+<link rel="modulepreload" href="./js/pages/about.js">
+<link rel="modulepreload" href="./js/pages/welcome.js">
+<link rel="modulepreload" href="./js/pages/home.js">
+<link rel="modulepreload" href="./js/pages/map.js">
+<link rel="modulepreload" href="./js/pages/fleet.js">
+<link rel="modulepreload" href="./js/pages/team.js">
+<link rel="modulepreload" href="./js/pages/integrations.js">
+<link rel="modulepreload" href="./js/pages/activity.js">
+<link rel="modulepreload" href="./js/pages/settings.js">
+<link rel="modulepreload" href="./js/pages/driver.js">
+<link rel="modulepreload" href="./js/pages/platform.js">
+<link rel="modulepreload" href="./js/parts/asset.js">
+<link rel="modulepreload" href="./js/parts/company.js">
+<link rel="modulepreload" href="./js/parts/connect.js">
+<link rel="modulepreload" href="./js/parts/invite.js">
 </head>
 <body>
-<div id="app"><div class="boot" aria-label="Loading"><span class="boot-mark"></span></div></div>
+<div id="app"><div class="boot" aria-label="Loading"><div class="boot-in"><span class="boot-mark"></span><span class="boot-msg">Opening Mando…</span></div></div></div>
+<script>setTimeout(function(){var m=document.querySelector('.boot-msg');if(m)m.textContent='Weak signal — still opening Mando…'},8000)</script>
 <script src="./config.js"></script>
-<script src="./vendor/leaflet/leaflet.js" defer></script>
-<script src="./vendor/qrcode.js" defer></script>
 <script type="module" src="./js/main.js"></script>
 </body>
 </html>
