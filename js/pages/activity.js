@@ -1,5 +1,5 @@
 // Activity: who did what in the company, newest first, by day. Every change in the database writes one line.
-import { html, useState, Icon, Empty, Seg, Skel, Top, useLoad } from '../ui.js';
+import { html, useState, Icon, Btn, Empty, Seg, Skel, Top, LoadError, Stale, useLoad } from '../ui.js';
 import { useApp } from '../ctx.js';
 import { loadAudit } from '../data.js';
 import { fmtTime, dayLabel, dayKey, ago } from '../util.js';
@@ -16,7 +16,7 @@ function plain(summary) {
 }
 
 const KIND = [
-  [/^license\./, 'license', 'violet'], [/^member\./, 'users', 'blue'], [/^integration\.error/, 'alert', 'red'],
+  [/^license\./, 'license', ''], [/^member\./, 'users', 'accent'], [/^integration\.error/, 'alert', 'red'],
   [/^(integration|device)\./, 'plug', 'green'], [/^api_key\./, 'key', ''], [/^asset\./, 'truck', ''], [/^org\./, 'building', 'amber'],
 ];
 const GROUPS = {
@@ -45,16 +45,20 @@ export function Activity() {
     if (!days.length || days[days.length - 1].k !== k) days.push({ k, label: dayLabel(x.at, org.timezone), items: [] });
     days[days.length - 1].items.push(x);
   }
-  const n = (k) => (log.data || []).filter((x) => GROUPS[k](x.action)).length;
-  return html`<${Top} title="Activity" sub=${`Everything that happens in ${org.name}, newest first`} />
+  const n = (k) => (log.data ? log.data.filter((x) => GROUPS[k](x.action)).length : null);
+  const NONE = { fleet: 'No changes to the fleet yet.', people: 'No changes to the team yet.', gps: 'No changes to GPS or connections yet.', company: 'No changes to the company or the license yet.' };
+  return html`<${Top} title="Activity" sub=${html`Everything that happens in ${org.name}, newest first${log.error && log.data ? html` · <${Stale} at=${log.at} retry=${log.retry} />` : null}`} />
     <div class="page">
-      <div class="toolbar"><${Seg} value=${g} onChange=${setG} options=${[
+      <div class="toolbar"><${Seg} label="Show" value=${g} onChange=${setG} options=${[
         { v: 'all', label: 'All', n: n('all') }, { v: 'fleet', label: 'Fleet', n: n('fleet') }, { v: 'people', label: 'People', n: n('people') },
         { v: 'gps', label: 'GPS & connections', n: n('gps') }, { v: 'company', label: 'Company & license', n: n('company') }]} /></div>
       <div class="card feed">
-        ${!log.data ? html`<div class="card-b"><${Skel} h=${260} /></div>`
+        ${log.failed ? html`<div class="card-b"><${LoadError} what="the activity" error=${log.error} retry=${log.retry} /></div>`
+          : !log.data ? html`<div class="card-b"><${Skel} h=${260} /></div>`
           : days.length ? days.map((d) => html`<div key=${d.k}><div class="day">${d.label}</div>
               <div class="list">${d.items.map((x) => html`<${ActivityRow} key=${x.id} x=${x} tz=${org.timezone} full />`)}</div></div>`)
+          : g !== 'all' && log.data.length ? html`<${Empty} cls="sm" icon="activity" title="Nothing in this group" text=${NONE[g]}>
+              <${Btn} size="sm" onClick=${() => setG('all')}>Show everything<//><//>`
           : html`<${Empty} icon="activity" title="Nothing here yet" text="Changes to the fleet, the team and your connections show up here." />`}
       </div>
     </div>`;

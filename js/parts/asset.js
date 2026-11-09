@@ -1,10 +1,10 @@
 // Vehicle forms: the full form (Fleet drawer) and the quick row (welcome step 2). Typing a VIN and pressing
 // Look up fills year, make and model from NHTSA's free public decoder; the check digit is verified on the spot,
 // and nothing is saved until every field makes sense (check.js) — no silent cuts, no silent rewrites.
-import { html, useState, useEffect, Icon, Btn, Field, ErrorBox, Seg } from '../ui.js';
+import { html, useState, useEffect, Icon, Btn, Field, ErrorBox, Seg, useForm } from '../ui.js';
 import { rpc } from '../api.js';
 import { BODIES, ASSET_KINDS, ASSET_STATUS, vinClean, vinOk, decodeVin } from '../util.js';
-import { nameCheck, textCheck, plateCheck, stateCheck, yearCheck, numberCheck, problems, focusFirst } from '../check.js';
+import { nameCheck, textCheck, plateCheck, stateCheck, yearCheck, numberCheck } from '../check.js';
 
 // a VIN that can't be one: wrong length, or letters VINs never use (a wrong check digit only warns — older vehicles differ)
 export function vinProblem(vin) {
@@ -28,7 +28,7 @@ function VinHint({ vin, info }) {
   return null;
 }
 
-export function VinField({ value, onInput, onDecoded, id = 'vin' }) {
+export function VinField({ value, onInput, onDecoded, id = 'vin', onBlur }) {
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState(null);
   useEffect(() => { if (!value) setInfo(null); }, [value]);        // the form was cleared: forget the last answer
@@ -42,12 +42,12 @@ export function VinField({ value, onInput, onDecoded, id = 'vin' }) {
       if (!d) setInfo({ tone: 'amber', text: 'No match in NHTSA\'s VIN database — fill in year, make and model by hand.' });
       else if (!vinOk(v)) setInfo({ tone: 'amber', text: `NHTSA's closest guess is ${what}, but this VIN's check digit doesn't match. Look for a typo first.` });
       else { onDecoded(d); setInfo({ tone: 'green', text: `Found: ${what}${d.note ? ' · ' + d.note : ''}` }); }
-    } catch { setInfo({ tone: 'dim', text: 'The VIN lookup didn\'t answer — fill it in by hand.' }); }
+    } catch (x) { setInfo({ tone: 'dim', text: /too long/.test(x?.message || '') ? x.message : 'The VIN lookup didn\'t answer — fill it in by hand.' }); }
     setBusy(false);
   };
   return html`<div class="col"><div class="vinrow">
       <input id=${id} class="inp mono" value=${value} maxlength="24" placeholder="17 characters" autocomplete="off" spellcheck="false"
-        onInput=${(e) => { setInfo(null); onInput(vinClean(e.target.value)); }} />
+        onInput=${(e) => { setInfo(null); onInput(vinClean(e.target.value)); }} onBlur=${onBlur} />
       <${Btn} busy=${busy} disabled=${!full} title=${full ? 'Look up year, make and model' : 'Type all 17 characters first'} onClick=${look}>Look up<//></div>
     <${VinHint} vin=${value} info=${info} /></div>`;
 }
@@ -55,7 +55,14 @@ export function VinField({ value, onInput, onDecoded, id = 'vin' }) {
 const EMPTY = { unit_no: '', kind: 'truck', body: '', vin: '', year: '', make: '', model: '', color: '', plate: '', plate_state: 'TX',
   capacity: '', capacity_unit: 'yd', status: 'active', odometer: '', notes: '' };
 const FORM_IDS = { unit_no: 'un', vin: 'vin', year: 'yr', make: 'mk', model: 'md', plate: 'pl', plate_state: 'ps', color: 'co', capacity: 'cp', odometer: 'od', notes: 'nt' };
+const RULES = {
+  unit_no: (v) => nameCheck(v, { what: 'Unit number', max: 40, empty: 'Type a unit number or name, like T-1 or Big Red.' }),
+  vin: vinProblem, year: yearCheck, make: (v) => textCheck(v, { what: 'Make', max: 40 }), model: (v) => textCheck(v, { what: 'Model', max: 60 }),
+  plate: plateCheck, plate_state: stateCheck, color: (v) => textCheck(v, { what: 'Color', max: 30 }),
+  capacity: (v) => numberCheck(v, 'Capacity'), odometer: (v) => numberCheck(v, 'Odometer'), notes: (v) => textCheck(v, { what: 'Notes', max: 2000 }),
+};
 
+// the full vehicle form. Its buttons sit in a row that stays at the bottom of the panel (form-foot), always in reach.
 export function AssetForm({ org, asset, onSaved, onCancel, footerLeft }) {
   const [f, setF] = useState(() => {
     const base = { ...EMPTY };
@@ -64,20 +71,13 @@ export function AssetForm({ org, asset, onSaved, onCancel, footerLeft }) {
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const [fe, setFe] = useState({});
-  const set = (k) => (e) => { setF({ ...f, [k]: e.target.value }); if (fe[k]) setFe({ ...fe, [k]: null }); };
+  const chk = useForm(f, RULES, FORM_IDS);
+  const fe = chk.errs;
+  const set = (k) => (e) => { setF({ ...f, [k]: e.target.value }); chk.edit(k, e.target.value); };
   const decoded = (d) => setF((x) => ({ ...x, year: x.year || d.year, make: x.make || d.make, model: x.model || d.model, kind: asset ? x.kind : d.kind || x.kind }));
   const save = async (e) => {
     e.preventDefault();
-    if (busy) return;
-    const errs = problems([
-      ['unit_no', nameCheck(f.unit_no, { what: 'Unit number', max: 40, empty: 'Type a unit number or name, like T-1 or Big Red.' })],
-      ['vin', vinProblem(f.vin)], ['year', yearCheck(f.year)], ['make', textCheck(f.make, { what: 'Make', max: 40 })], ['model', textCheck(f.model, { what: 'Model', max: 60 })],
-      ['plate', plateCheck(f.plate)], ['plate_state', stateCheck(f.plate_state)], ['color', textCheck(f.color, { what: 'Color', max: 30 })],
-      ['capacity', numberCheck(f.capacity, 'Capacity')], ['odometer', numberCheck(f.odometer, 'Odometer')], ['notes', textCheck(f.notes, { what: 'Notes', max: 2000 })],
-    ]);
-    setFe(errs);
-    if (Object.keys(errs).length) { focusFirst(errs, FORM_IDS); return; }
+    if (busy || !chk.ok()) return;
     setErr(null); setBusy(true);
     try {
       const p = { ...f, unit_no: f.unit_no.trim(), plate_state: f.plate_state.trim().toUpperCase(), capacity: f.capacity.replace(/,/g, ''),
@@ -87,58 +87,59 @@ export function AssetForm({ org, asset, onSaved, onCancel, footerLeft }) {
       onSaved(saved, !asset);
     } catch (x) { setErr(x); setBusy(false); }
   };
+  const b = (k) => chk.blur(k);
   return html`<form class="form" onSubmit=${save} id="assetform" novalidate>
     <div class="grid2">
       <${Field} label="Unit number or name" id="un" help="What your crew calls it — T-1, Truck 12, Big Red." error=${fe.unit_no}><input id="un" class="inp" value=${f.unit_no}
-        onInput=${set('unit_no')} autofocus=${!asset} /><//>
+        onInput=${set('unit_no')} onBlur=${b('unit_no')} /><//>
       <${Field} label="Status" id="stt"><select id="stt" class="sel" value=${f.status} onChange=${set('status')}>
         ${Object.entries(ASSET_STATUS).map(([k, [v]]) => html`<option value=${k}>${v}</option>`)}</select><//>
     </div>
-    <${Field} label="Type"><${Seg} value=${f.kind} onChange=${(v) => setF({ ...f, kind: v })} options=${Object.entries(ASSET_KINDS).map(([v, label]) => ({ v, label }))} /><//>
-    <${Field} label="VIN" id="vin" error=${fe.vin}><${VinField} value=${f.vin} onInput=${(v) => { setF((x) => ({ ...x, vin: v })); if (fe.vin) setFe({ ...fe, vin: null }); }} onDecoded=${decoded} /><//>
+    <${Field} label="Type"><${Seg} value=${f.kind} onChange=${(v) => setF({ ...f, kind: v })} label="Type" options=${Object.entries(ASSET_KINDS).map(([v, label]) => ({ v, label }))} /><//>
+    <${Field} label="VIN" id="vin" error=${fe.vin}><${VinField} value=${f.vin} onInput=${(v) => { setF((x) => ({ ...x, vin: v })); chk.edit('vin', v); }} onBlur=${b('vin')} onDecoded=${decoded} /><//>
     <div class="grid3">
-      <${Field} label="Year" id="yr" error=${fe.year}><input id="yr" class="inp" value=${f.year} onInput=${set('year')} inputmode="numeric" maxlength="4" /><//>
-      <${Field} label="Make" id="mk" error=${fe.make}><input id="mk" class="inp" value=${f.make} onInput=${set('make')} /><//>
-      <${Field} label="Model" id="md" error=${fe.model}><input id="md" class="inp" value=${f.model} onInput=${set('model')} /><//>
+      <${Field} label="Year" id="yr" error=${fe.year}><input id="yr" class="inp" value=${f.year} onInput=${set('year')} onBlur=${b('year')} inputmode="numeric" maxlength="4" /><//>
+      <${Field} label="Make" id="mk" error=${fe.make}><input id="mk" class="inp" value=${f.make} onInput=${set('make')} onBlur=${b('make')} /><//>
+      <${Field} label="Model" id="md" error=${fe.model}><input id="md" class="inp" value=${f.model} onInput=${set('model')} onBlur=${b('model')} /><//>
     </div>
     <div class="grid3">
-      <${Field} label="Plate" id="pl" error=${fe.plate}><input id="pl" class="inp mono" value=${f.plate} onInput=${set('plate')} autocomplete="off" /><//>
-      <${Field} label="Plate state" id="ps" error=${fe.plate_state}><input id="ps" class="inp" value=${f.plate_state} onInput=${set('plate_state')} maxlength="2" /><//>
-      <${Field} label="Color" id="co" error=${fe.color}><input id="co" class="inp" value=${f.color} onInput=${set('color')} /><//>
+      <${Field} label="Plate" id="pl" error=${fe.plate}><input id="pl" class="inp mono" value=${f.plate} onInput=${set('plate')} onBlur=${b('plate')} autocomplete="off" /><//>
+      <${Field} label="Plate state" id="ps" error=${fe.plate_state}><input id="ps" class="inp" value=${f.plate_state} onInput=${set('plate_state')} onBlur=${b('plate_state')} maxlength="2" /><//>
+      <${Field} label="Color" id="co" error=${fe.color}><input id="co" class="inp" value=${f.color} onInput=${set('color')} onBlur=${b('color')} /><//>
     </div>
     ${['truck', 'trailer', 'equipment'].includes(f.kind) ? html`<div class="grid3">
       <${Field} label="Body" id="bd"><select id="bd" class="sel" value=${f.body} onChange=${set('body')}><option value="">—</option>
-        ${BODIES.map((b) => html`<option value=${b}>${b}</option>`)}</select><//>
-      <${Field} label="Capacity" id="cp" error=${fe.capacity}><input id="cp" class="inp" value=${f.capacity} onInput=${set('capacity')} inputmode="decimal" /><//>
+        ${BODIES.map((x) => html`<option value=${x}>${x}</option>`)}</select><//>
+      <${Field} label="Capacity" id="cp" error=${fe.capacity}><input id="cp" class="inp" value=${f.capacity} onInput=${set('capacity')} onBlur=${b('capacity')} inputmode="decimal" /><//>
       <${Field} label="In" id="cu"><select id="cu" class="sel" value=${f.capacity_unit} onChange=${set('capacity_unit')}>
         <option value="yd">cubic yards</option><option value="ton">tons</option><option value="gal">gallons</option><option value="lb">pounds</option></select><//>
     </div>` : null}
     <div class="grid2">
-      <${Field} label="Odometer" id="od" help="Optional — miles today." error=${fe.odometer}><input id="od" class="inp" value=${f.odometer} onInput=${set('odometer')} inputmode="numeric" /><//>
+      <${Field} label="Odometer" id="od" help="Optional — miles today." error=${fe.odometer}><input id="od" class="inp" value=${f.odometer} onInput=${set('odometer')} onBlur=${b('odometer')} inputmode="numeric" /><//>
     </div>
-    <${Field} label="Notes" id="nt" error=${fe.notes}><textarea id="nt" class="txt" value=${f.notes} onInput=${set('notes')} placeholder="Anything the team should know"></textarea><//>
+    <${Field} label="Notes" id="nt" error=${fe.notes}><textarea id="nt" class="txt" value=${f.notes} onInput=${set('notes')} onBlur=${b('notes')} placeholder="Anything the team should know"></textarea><//>
     <${ErrorBox} error=${err} />
-    <div class="row wrap">${footerLeft}<span class="grow"></span>
+    <div class="form-foot">${footerLeft}<span class="grow"></span>
       ${onCancel ? html`<${Btn} onClick=${onCancel}>Cancel<//>` : null}
       <${Btn} kind="primary" type="submit" busy=${busy}>${asset ? 'Save changes' : 'Add vehicle'}<//></div>
   </form>`;
 }
 
-// one line per truck, for the welcome screen
-export function QuickAdd({ org, onAdded }) {
+// one line per truck, for the welcome screen. `primary`: its Add is the screen's main button (no truck added yet)
+export function QuickAdd({ org, onAdded, primary = true }) {
   const [unit, setUnit] = useState('');
   const [vin, setVin] = useState('');
   const [plate, setPlate] = useState('');
   const [found, setFound] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const [fe, setFe] = useState({});
+  const chk = useForm({ unit, vin, plate },
+    { unit: (v) => nameCheck(v, { what: 'Unit', max: 40, empty: 'Type a unit number, like 101 or T-1.' }), vin: vinProblem, plate: plateCheck },
+    { unit: 'qa-unit', vin: 'qa-vin', plate: 'qa-pl' });
+  const fe = chk.errs;
   const add = async (e) => {
     e.preventDefault();
-    if (busy) return;
-    const errs = problems([['unit', nameCheck(unit, { what: 'Unit', max: 40, empty: 'Type a unit number, like 101 or T-1.' })], ['vin', vinProblem(vin)], ['plate', plateCheck(plate)]]);
-    setFe(errs);
-    if (Object.keys(errs).length) { focusFirst(errs, { unit: 'qa-unit', vin: 'qa-vin', plate: 'qa-pl' }); return; }
+    if (busy || !chk.ok()) return;
     setErr(null); setBusy(true);
     try {
       let d = found;
@@ -152,10 +153,13 @@ export function QuickAdd({ org, onAdded }) {
   };
   return html`<form class="col" onSubmit=${add} novalidate>
     <div class="quick">
-      <${Field} label="Unit" id="qa-unit" error=${fe.unit}><input id="qa-unit" class="inp" value=${unit} onInput=${(e) => { setUnit(e.target.value); setErr(null); setFe((x) => ({ ...x, unit: null })); }} placeholder="T-1" /><//>
-      <${Field} label="VIN (optional)" id="qa-vin" error=${fe.vin}><${VinField} id="qa-vin" value=${vin} onInput=${(v) => { setVin(v); setFound(null); setErr(null); setFe((x) => ({ ...x, vin: null })); }} onDecoded=${setFound} /><//>
-      <${Field} label="Plate (optional)" id="qa-pl" error=${fe.plate}><input id="qa-pl" class="inp mono" value=${plate} onInput=${(e) => { setPlate(e.target.value); setErr(null); setFe((x) => ({ ...x, plate: null })); }} /><//>
-      <div class="field"><label class="sr">Add</label><${Btn} kind="primary" icon="plus" type="submit" busy=${busy}>Add<//></div>
+      <${Field} label="Unit" id="qa-unit" error=${fe.unit}><input id="qa-unit" class="inp" value=${unit} onInput=${(e) => { setUnit(e.target.value); setErr(null); chk.edit('unit', e.target.value); }}
+        onBlur=${chk.blur('unit')} placeholder="T-1" /><//>
+      <${Field} label="VIN (optional)" id="qa-vin" error=${fe.vin}><${VinField} id="qa-vin" value=${vin} onInput=${(v) => { setVin(v); setFound(null); setErr(null); chk.edit('vin', v); }}
+        onBlur=${chk.blur('vin')} onDecoded=${setFound} /><//>
+      <${Field} label="Plate (optional)" id="qa-pl" error=${fe.plate}><input id="qa-pl" class="inp mono" value=${plate} onInput=${(e) => { setPlate(e.target.value); setErr(null); chk.edit('plate', e.target.value); }}
+        onBlur=${chk.blur('plate')} /><//>
+      <div class="field"><span class="sr" aria-hidden="true">Add</span><${Btn} kind=${primary ? 'primary' : ''} icon="plus" type="submit" busy=${busy}>Add<//></div>
     </div>
     <${ErrorBox} error=${err} />
   </form>`;

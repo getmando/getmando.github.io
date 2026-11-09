@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <title>Mando</title>
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <script>
 // GitHub Pages answers every unknown address with this page. Mando's pages live after the "#" (#/privacy), so an
 // address typed without it (/privacy, /terms, /pricing) opens that page in the app instead of a dead end.
@@ -12,8 +15,16 @@
   location.replace('/' + (location.hash ? location.hash : p ? '#/' + p : ''));
 })();
 </script>
+<!-- the app's page colors (app.css --bg, --dim, --accent-ink), so nobody gets a white flash in dark mode -->
+<style>
+:root{color-scheme:light dark}
+html,body{margin:0;background:#F5F5F7}
+body{padding:24px;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#66666B}
+a{color:#0066CC}
+@media (prefers-color-scheme:dark){html,body{background:#000}body{color:#98989D}a{color:#409CFF}}
+</style>
 </head>
-<body style="font-family:system-ui,sans-serif;padding:24px">
-<p>Opening Mando… If nothing happens, <a href="/">open Mando's home page</a>.</p>
+<body>
+<p>Taking you there… If nothing happens, <a href="/">open the home page</a>.</p>
 </body>
 </html>

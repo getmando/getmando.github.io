@@ -42,7 +42,18 @@ export function hashColor(s) {
   for (const ch of String(s || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return palette[h % palette.length];
 }
+// letters on a color someone picked: white when the color is dark enough (relative luminance ≤ 0.18), else black —
+// either way at least 4.5:1, so the company keeps its color and its initials stay readable (DESIGN.md)
+export function inkOn(color) {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(String(color || '').trim());
+  if (!m) return '#FFFFFF';
+  const x = m[1].length === 3 ? m[1].replace(/./g, (c) => c + c) : m[1];
+  const lin = (i) => { const v = parseInt(x.slice(i, i + 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4) <= 0.18 ? '#FFFFFF' : '#000000';
+}
 export const firstName = (n) => String(n || '').trim().split(/\s+/)[0] || '';
+// "Lone Star Aggregates' license", "Kim's invitation"
+export const poss = (n) => { const s = String(n || '').trim(); return /s$/i.test(s) ? s + '\'' : s + '\'s'; };
 export const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 // ---------- time ----------
@@ -93,12 +104,18 @@ export const KINDS = {
   contractor: 'General contractor', subcontractor: 'Subcontractor', hauler: 'Hauling / trucking', supplier: 'Material supplier',
   ready_mix: 'Ready-mix concrete', vendor: 'Vendor / store', other: 'Other',
 };
+// `desc` describes the role to whoever hands it out; `you` says it to the person who gets it (the Join page)
 export const ROLES = {
-  owner:      { name: 'Owner',      desc: 'Everything, including the license and who owns the company.' },
-  admin:      { name: 'Admin',      desc: 'Team, settings, integrations and the fleet.' },
-  dispatcher: { name: 'Dispatcher', desc: 'Runs the fleet and the live map. No team or settings.' },
-  driver:     { name: 'Driver',     desc: 'Uses Driver mode: the phone shares its location only while it says Sharing, and they can stop any time. Sees the fleet.' },
-  viewer:     { name: 'Viewer',     desc: 'Sees everything, changes nothing. Good for accounting.' },
+  owner:      { name: 'Owner',      desc: 'Everything, including the license and who owns the company.',
+                you: 'You can do everything, including the license and who owns the company.' },
+  admin:      { name: 'Admin',      desc: 'Team, settings, connections and the fleet.',
+                you: 'You\'ll manage the team, the settings, the connections and the fleet.' },
+  dispatcher: { name: 'Dispatcher', desc: 'Runs the fleet and the live map. No team or settings.',
+                you: 'You\'ll run the fleet and the live map.' },
+  driver:     { name: 'Driver',     desc: 'Uses Driver mode: the phone shares its location only while it says Sharing, and they can stop any time. Sees the fleet.',
+                you: 'You\'ll use Driver mode: your phone shares its location only while it says Sharing, and you can stop any time. You\'ll also see the fleet.' },
+  viewer:     { name: 'Viewer',     desc: 'Sees everything, changes nothing. Good for accounting.',
+                you: 'You\'ll see everything and change nothing.' },
 };
 const PERMS = {
   view: ['owner', 'admin', 'dispatcher', 'driver', 'viewer'], fleet: ['owner', 'admin', 'dispatcher'],
@@ -170,7 +187,14 @@ export const PROVIDERS = [
   { key: 'fleetio', name: 'Fleetio', cat: 'fleet', color: '#1F8A70', mono: 'F', blurb: 'Fleet maintenance records: import vehicles, plates, VINs and odometers.', soon: true },
   { key: 'quickbooks', name: 'QuickBooks Online', cat: 'accounting', color: '#2CA01C', mono: 'QB', blurb: 'Send loads and tickets to invoicing.', soon: true },
   { key: 'command_alkon', name: 'Command Alkon', cat: 'ready_mix', color: '#00539B', mono: 'CA', blurb: 'Ready-mix dispatch: delivery tickets and truck ETAs.', soon: true },
-];export const providerOf = (key) => PROVIDERS.find((p) => p.key === key);
+];
+export const providerOf = (key) => PROVIDERS.find((p) => p.key === key);
+// the two built-in ways to get positions (no outside company): one color and icon each, wherever they're drawn
+// (Connections and the setup's GPS step)
+export const BUILTIN = {
+  driver: { key: 'driver', name: 'Driver app', mono: '', color: '#34C759', icon: 'phone', blurb: 'Drivers\' phones as GPS trackers. No hardware — they pick the truck they\'re in and tap Start.' },
+  api: { key: 'api', name: 'Open API', mono: '', color: '#5E5CE6', icon: 'code', blurb: 'For software people: your other systems (a dispatch board, another GPS, your own app) send truck positions with your company\'s key.' },
+};
 
 // what a vehicle is doing now, from the freshest of its GPS devices
 export function vstate(devs) {
@@ -187,7 +211,7 @@ export function vstate(devs) {
     ? { key: 'moving', label: 'Last seen moving', tone: 'amber', dev: d, sub: [d.last_address, `seen ${ago(d.last_at)}`].filter(Boolean).join(' · ') }
     : { key: 'moving', label: `Moving · ${Math.round(mph)} mph`, tone: 'green', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
   if (d.last_ignition) return { key: 'idle', label: 'Idling', tone: 'amber', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
-  return { key: 'stopped', label: 'Stopped', tone: 'blue', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
+  return { key: 'stopped', label: 'Stopped', tone: '', dev: d, sub: d.last_address || `Updated ${ago(d.last_at)}` };
 }
 export const SOURCE = { phone: 'Driver\'s phone', api: 'Open API' };
 export const sourceName = (s) => SOURCE[s] || providerOf(s)?.name || s;
@@ -208,7 +232,12 @@ const title = (s) => String(s || '').toLowerCase().replace(/\b[a-z]/g, (m) => m.
 // NHTSA's free public VIN decoder (vpic.nhtsa.dot.gov) — the VIN is the only thing sent
 export async function decodeVin(v) {
   v = vinClean(v);
-  const r = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(v)}?format=json`);
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 20000);
+  let r;
+  try { r = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(v)}?format=json`, { signal: ac.signal }); }
+  catch (x) { throw new Error(ac.signal.aborted ? 'The VIN lookup is taking too long — try again, or type the details yourself.' : 'lookup failed'); }
+  finally { clearTimeout(t); }
   if (!r.ok) throw new Error('lookup failed');
   const x = (await r.json())?.Results?.[0] || {};
   if (!x.Make) return null;

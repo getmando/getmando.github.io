@@ -1,13 +1,17 @@
 {
+  "id": "/",
   "name": "Mando",
   "short_name": "Mando",
-  "description": "Fleet, people, GPS and integrations — one command center per company.",
+  "description": "Your trucks, your people and your GPS in one place — for construction and hauling companies.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#F5F5F7",
+  "theme_color": "#F5F5F7",
   "icons": [
     { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "./icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
   ]
 }

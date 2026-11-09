@@ -21,19 +21,25 @@ export function About() {
     if (el) el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
   }, [at]);
   const back = () => (history.length > 1 ? history.back() : go(signedIn ? 'home' : ''));
+  // the section links jump within the page without adding a step to Back (the address still names the section)
+  const jump = (k) => (e) => {
+    e.preventDefault();
+    try { history.replaceState(history.state, '', '#/about/' + k); } catch { /* old browser: the link still works below */ }
+    const el = document.getElementById('ab-' + k);
+    if (el) { el.scrollIntoView({ block: 'start' }); if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true }); }
+  };
   const ask = askWho();
   const mail = C.SUPPORT_EMAIL ? html`<a href=${'mailto:' + C.SUPPORT_EMAIL}>${C.SUPPORT_EMAIL}</a>` : ask;
 
   return html`<div class="doc">
     <header class="doc-top"><a class="row doc-brand" href="#/"><${Mark} /><span class="wordmark">${BRAND}</span></a><span class="grow"></span>
       <${Btn} size="sm" onClick=${back}>Back<//></header>
-    <main class="doc-body">
+    <main class="doc-body" id="content">
       <h1>About ${BRAND} and your data</h1>
       <p class="lede">Plain answers on one page. Updated November 8, 2026.</p>
-      <nav class="doc-nav" aria-label="On this page">${SECTIONS.map(([k, l]) => html`<a key=${k} href=${'#/about/' + k}>${l}</a>`)}</nav>
+      <nav class="doc-nav" aria-label="On this page">${SECTIONS.map(([k, l]) => html`<a key=${k} href=${'#/about/' + k} onClick=${jump(k)}>${l}</a>`)}</nav>
 
-      <section id="ab-what"><p>${BRAND} is a command center for construction and hauling companies: your trucks, your people and your GPS in one place.
-        Each company gets its own command center with a license.</p></section>
+      <section id="ab-what"><p>${`${C.TAGLINE ? `${BRAND}: ${C.TAGLINE}` : `${BRAND} is a command center for construction and hauling companies.`} Each company gets its own command center with a license.`}</p></section>
 
       <section id="ab-pricing"><h2>What it costs</h2>
         <p>${C.PRICING || html`${BRAND} is sold as a license for one company. The price and how long the license lasts are agreed before the license is sent to you. To ask about price, write to ${mail}.`}</p>
@@ -96,6 +102,7 @@ export function About() {
         <p>Questions, a problem, or a lost owner password: ${mail}.</p></section>
 
       <div class="doc-foot"><${Btn} onClick=${back}>Back<//>${signedIn ? null : html`<${Btn} kind="primary" onClick=${() => go('signin')}>Sign in<//>`}</div>
+      <p class="dim xs doc-ver">${BRAND} · version ${C.VERSION || '—'}</p>
     </main>
   </div>`;
 }

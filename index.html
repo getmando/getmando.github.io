@@ -4,8 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<meta name="description" content="Fleet, people, GPS and integrations for construction and hauling companies — one command center per company.">
+<!-- the one line (config.js TAGLINE) — description, og:description and twitter:description say it word for word -->
+<meta name="description" content="Your trucks, your people and your GPS in one place — for construction and hauling companies.">
+<!-- not listed by search engines until the name and the address are final (README: "Changing the name later") -->
+<meta name="robots" content="noindex">
 <title>Mando</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Mando">
+<meta property="og:title" content="Mando">
+<meta property="og:description" content="Your trucks, your people and your GPS in one place — for construction and hauling companies.">
+<meta property="og:url" content="https://getmando.github.io/">
+<meta property="og:image" content="https://getmando.github.io/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Mando — your trucks, your people and your GPS in one place">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mando">
+<meta name="twitter:description" content="Your trucks, your people and your GPS in one place — for construction and hauling companies.">
+<meta name="twitter:image" content="https://getmando.github.io/og.png">
+<link rel="icon" href="./favicon.ico" sizes="32x32">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -19,12 +36,14 @@ html[data-theme="dark"] .boot{color:#98989D}
 .boot-mark{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#2F6BFF,#6E44FF)}
 html.motion .boot-mark{animation:bootpulse 1.2s ease-in-out infinite}
 @keyframes bootpulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(.92);opacity:.6}}
+.boot.sm{min-height:200px}.boot-msg{text-align:center;max-width:320px}
 </style>
+<noscript><style>#app{display:none}</style></noscript>
 <!-- the font never holds the page back: text shows in the phone's own font until Inter arrives -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"></noscript>
 <link rel="stylesheet" href="./app.css">
 <script type="importmap">{"imports":{"preact":"./vendor/preact.module.js","preact/hooks":"./vendor/hooks.module.js","htm":"./vendor/htm.module.js"}}</script>
 <!-- every module is asked for at once instead of one wave of imports at a time (each wave costs a round trip) -->
@@ -57,8 +76,9 @@ html.motion .boot-mark{animation:bootpulse 1.2s ease-in-out infinite}
 <link rel="modulepreload" href="./js/parts/invite.js">
 </head>
 <body>
-<div id="app"><div class="boot" aria-label="Loading"><div class="boot-in"><span class="boot-mark"></span><span class="boot-msg">Opening Mando…</span></div></div></div>
-<script>setTimeout(function(){var m=document.querySelector('.boot-msg');if(m)m.textContent='Weak signal — still opening Mando…'},8000)</script>
+<div id="app"><div class="boot" role="status"><div class="boot-in"><span class="boot-mark"></span><span class="boot-msg">Opening your command center…</span></div></div></div>
+<noscript><div class="boot"><div class="boot-in"><span class="boot-mark"></span><span>This page needs JavaScript. Turn it on in your browser's settings, then reload the page.</span></div></div></noscript>
+<script>setTimeout(function(){var m=document.querySelector('.boot-msg');if(m)m.textContent='Weak signal — still opening your command center…'},8000)</script>
 <script src="./config.js"></script>
 <script type="module" src="./js/main.js"></script>
 </body>

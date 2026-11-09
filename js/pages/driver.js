@@ -1,11 +1,11 @@
 // Driver mode: the phone as the truck's GPS. The driver picks the truck they're in today (trucks change hands),
 // taps Start, and the phone sends its position every 15 seconds while the screen stays on (Wake Lock).
 // Nothing is sent unless this screen says Sharing.
-import { html, useState, useEffect, useRef, Icon, Btn, Empty, ErrorBox, Top, useLoad } from '../ui.js';
+import { html, useState, useEffect, useRef, Icon, Btn, Empty, ErrorBox, Skel, Top, LoadError, useLoad } from '../ui.js';
 import { useApp } from '../ctx.js';
 import { rpc } from '../api.js';
 import { loadAssets } from '../data.js';
-import { fmtTime } from '../util.js';
+import { fmtTime, can } from '../util.js';
 import { vehicleIcon, vehicleLine } from '../parts/asset.js';
 
 const EVERY = 15000;
@@ -83,15 +83,19 @@ export function Driver() {
           iPhone: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App.<br />
           Android: tap the lock next to the address → Permissions → Location → Allow. Then tap Start again.</div></div>`
         : html`<${ErrorBox} error=${err} />`}
-      <div class="col"><b>Which truck are you driving today?</b>
-        ${!assets.data ? null : trucks.length ? html`<div class="trucks">
-          ${trucks.map((a) => html`<button type="button" key=${a.id} class=${'truckbtn' + (truck === a.id ? ' on' : '')} disabled=${on} onClick=${() => pick(a.id)}>
+      <div class="col" role="group" aria-label="Which truck are you driving today?"><b>Which truck are you driving today?</b>
+        ${assets.failed ? html`<${LoadError} what="the trucks" error=${assets.error} retry=${assets.retry} />`
+          : !assets.data ? html`<${Skel} h=${120} />` : html`<div class="trucks">
+          ${trucks.length ? null : html`<div class="card"><${Empty} cls="sm" icon="truck" title="No trucks in the fleet yet"
+              text=${can(org.role, 'fleet') ? 'Add them in Fleet, then pick yours here. Until then you can share just your position.'
+                : 'Ask whoever runs your fleet to add them. Until then you can share just your position.'}>
+              ${can(org.role, 'fleet') ? html`<a class="btn sm" href="#/fleet/new"><${Icon} n="plus" />Add a truck</a>` : null}<//></div>`}
+          ${trucks.map((a) => html`<button type="button" key=${a.id} class=${'truckbtn' + (truck === a.id ? ' on' : '')} aria-pressed=${truck === a.id ? 'true' : 'false'} disabled=${on} onClick=${() => pick(a.id)}>
             <span class="u-ic"><${Icon} n=${vehicleIcon(a.kind)} /></span><div class="grow"><b>${a.unit_no}</b><div class="dim sm">${vehicleLine(a) || a.plate || ''}</div></div>
             ${truck === a.id ? html`<${Icon} n="check" />` : null}</button>`)}
-          <button type="button" class=${'truckbtn' + (truck === 'none' ? ' on' : '')} disabled=${on} onClick=${() => pick('none')}>
+          <button type="button" class=${'truckbtn' + (truck === 'none' ? ' on' : '')} aria-pressed=${truck === 'none' ? 'true' : 'false'} disabled=${on} onClick=${() => pick('none')}>
             <span class="u-ic"><${Icon} n="user" /></span><div class="grow"><b>Not in a truck</b><div class="dim sm">Share just my position</div></div>
-            ${truck === 'none' ? html`<${Icon} n="check" />` : null}</button></div>`
-          : html`<div class="card"><${Empty} cls="sm" icon="truck" text="No vehicles yet — ask your dispatcher to add the trucks." /></div>`}
+            ${truck === 'none' ? html`<${Icon} n="check" />` : null}</button></div>`}
       </div>
       <p class="dim sm">Keep this screen open while you drive — it stays on while sharing. ${org.name} sees your position only while this says Sharing:
         it's sent every 15 seconds, seen by the people at ${org.name} who use the live map, and kept 180 days. <a href="#/about/drivers">More about this</a></p>

@@ -1,10 +1,11 @@
-// Shared building blocks: htm binding, icons, buttons, fields, drawer, modal, empty states, chips,
-// badges, rings, QR, data loading. Every component is defined once, at the top level.
+// Shared building blocks: htm binding, icons, buttons, fields, drawer, modal, sheet, empty and error states, chips,
+// badges, rings, QR, data loading, form checks. Every component is defined once, at the top level.
 import { h, render, Fragment, createContext } from 'preact';
 import { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { initials, hashColor, copy, qrSvg, loadScript } from './util.js';
+import { initials, hashColor, inkOn, copy, qrSvg, loadScript, fmtTime, isPhone } from './util.js';
 import { publicUrl } from './api.js';
+import { focusFirst } from './check.js';
 
 export const html = htm.bind(h);
 export { h, render, Fragment, createContext, useState, useEffect, useRef, useContext, useMemo, useCallback };
@@ -78,18 +79,22 @@ export function Mark({ cls = '' }) {
     stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="36.5" r="3.6" fill="#fff"/></svg></span>`;
 }
 
+// letters on a color the company or a provider picked: black or white, whichever reads (DESIGN.md, the initials rule)
 export function OrgBadge({ org, cls = '' }) {
   const url = org?.logo_path ? publicUrl('org-public', org.logo_path) : null;
-  return html`<span class=${'orgbadge ' + cls} style=${org?.brand_color ? `--org:${org.brand_color}` : ''}>
+  return html`<span class=${'orgbadge ' + cls} style=${org?.brand_color ? `--org:${org.brand_color};color:${inkOn(org.brand_color)}` : ''}>
     ${url ? html`<img src=${url} alt="" />` : initials(org?.name)}</span>`;
 }
 
 export function Avatar({ name, cls = '' }) {
-  return html`<span class=${'av ' + cls} style=${`--c:${hashColor(name)}`}>${initials(name)}</span>`;
+  const c = hashColor(name);
+  return html`<span class=${'av ' + cls} style=${`--c:${c};color:${inkOn(c)}`}>${initials(name)}</span>`;
 }
 
+// `busy` shows a spinner and blocks a second press until the work is done (disabled comes after the spread, so a
+// `disabled` passed in can't switch it back on)
 export function Btn({ kind = '', size = '', icon, busy, children, cls = '', ...p }) {
-  return html`<button type="button" class=${`btn ${kind} ${size} ${cls}`} disabled=${busy || p.disabled} ...${p}>
+  return html`<button type="button" ...${p} class=${`btn ${kind} ${size} ${cls}`} disabled=${!!(busy || p.disabled)} aria-busy=${busy ? 'true' : null}>
     ${busy ? html`<span class="spin"></span>` : icon ? html`<${Icon} n=${icon} />` : null}${children}</button>`;
 }
 
@@ -97,10 +102,42 @@ export function Chip({ tone = '', icon, children, cls = '' }) {
   return html`<span class=${`chip ${tone} ${cls}`}>${icon ? html`<${Icon} n=${icon} />` : null}${children}</span>`;
 }
 
-// a labelled field; `error` (a plain sentence: what's wrong and what to type) replaces the help line and outlines it
+// a labelled field; `error` (a plain sentence: what's wrong and what to type) replaces the help line and outlines it.
+// The input (the element with `id`) is told about it: aria-invalid, and aria-describedby pointing at the error or the help.
 export function Field({ label, help, error, children, cls = '', id }) {
+  useEffect(() => {
+    const el = id && document.getElementById(id);
+    if (!el) return;
+    if (error) { el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', id + '-err'); }
+    else {
+      el.removeAttribute('aria-invalid');
+      if (help) el.setAttribute('aria-describedby', id + '-help'); else el.removeAttribute('aria-describedby');
+    }
+  }, [error, !!help, id]);
   return html`<div class=${'field ' + cls + (error ? ' bad' : '')}>${label ? html`<label for=${id}>${label}</label>` : null}${children}${error
-    ? html`<div class="ferr" role="alert">${error}</div>` : help ? html`<div class="help">${help}</div>` : null}</div>`;
+    ? html`<div class="ferr" id=${id ? id + '-err' : undefined} role="alert">${error}</div>`
+    : help ? html`<div class="help" id=${id ? id + '-help' : undefined}>${help}</div>` : null}</div>`;
+}
+
+// checks shown on the spot: a field is checked when you leave it (once something is typed in it), checked again as you
+// type while it shows a problem (so the message goes away the moment it's right), and every field on save — the first
+// wrong one gets the focus. `rules` = { key: (value, all) => message | null }; `ids` = { key: element id }, in screen order.
+export function useForm(values, rules, ids) {
+  const [errs, setErrs] = useState({});
+  const msg = (k, v) => (rules[k] ? rules[k](v === undefined ? values[k] : v, values) || null : null);
+  return {
+    errs,
+    blur: (k) => () => { if (String(values[k] ?? '').trim()) setErrs((e) => ({ ...e, [k]: msg(k) })); },
+    edit: (k, v) => { if (errs[k]) setErrs((e) => ({ ...e, [k]: msg(k, v) })); },
+    ok: () => {
+      const e = {};
+      for (const k of Object.keys(ids)) { const m = msg(k); if (m) e[k] = m; }
+      setErrs(e);
+      focusFirst(e, ids);
+      return !Object.keys(e).length;
+    },
+    set: (k, m) => setErrs((e) => ({ ...e, [k]: m || null })),
+  };
 }
 
 export function Password({ value, onInput, placeholder = '', auto = 'new-password', meter = false, id, err = false }) {
@@ -115,9 +152,30 @@ export function Password({ value, onInput, placeholder = '', auto = 'new-passwor
   </div>`;
 }
 
-export function ErrorBox({ error }) {
+// a plain sentence; when the server said something more technical, it waits behind "Details" (for support, not for reading)
+export function ErrorBox({ error, id }) {
   if (!error) return null;
-  return html`<div class="err" role="alert"><${Icon} n="alert" /><div>${typeof error === 'string' ? error : error.message}</div></div>`;
+  const raw = typeof error === 'string' ? null : error.raw;
+  return html`<div class="err" role="alert" id=${id}><${Icon} n="alert" /><div class="grow">${typeof error === 'string' ? error : error.message}
+    ${raw && raw !== error.message ? html`<details class="more"><summary>Details</summary><p>${raw}</p></details>` : null}</div></div>`;
+}
+
+// a read that failed: say so (never a false "nothing here yet") and offer to try again
+export function LoadError({ what = 'this', error, retry, cls = '' }) {
+  return html`<div class=${'loaderr ' + cls} role="alert"><div class="e-ic"><${Icon} n="alert" /></div>
+    <div class="grow"><b>Couldn't load ${what}</b><span>${error?.message || 'Check the connection and try again.'}</span></div>
+    ${retry ? html`<${Btn} size="sm" icon="refresh" onClick=${retry}>Try again<//>` : null}</div>`;
+}
+
+// a refresh that failed while the last good data stays on screen
+export function Stale({ at, retry }) {
+  return html`<span class="stale" role="status">Not updated since ${fmtTime(at)}${retry
+    ? html`<span aria-hidden="true"> · </span><button type="button" onClick=${retry}>Retry</button>` : null}</span>`;
+}
+
+// waiting, in words (a spinner alone says nothing on a slow phone)
+export function Busy({ text = 'Loading…', cls = '' }) {
+  return html`<div class=${'boot ' + cls} role="status"><div class="boot-in"><span class="boot-mark"></span><span class="boot-msg">${text}</span></div></div>`;
 }
 
 export function Empty({ icon = 'spark', title, text, children, cls = '' }) {
@@ -125,16 +183,17 @@ export function Empty({ icon = 'spark', title, text, children, cls = '' }) {
     ${text ? html`<p>${text}</p>` : null}${children ? html`<div class="row wrap">${children}</div>` : null}</div>`;
 }
 
-export function Seg({ value, options, onChange, cls = '' }) {
-  return html`<div class=${'seg ' + cls} role="tablist">${options.map((o) => html`<button type="button" role="tab" aria-selected=${o.v === value}
-    class=${o.v === value ? 'on' : ''} onClick=${() => onChange(o.v)}>${o.label}${o.n !== undefined ? html`<span class="n">${o.n}</span>` : null}</button>`)}</div>`;
+// a short choice or a filter: buttons that say which one is pressed (`n` = a count, shown once the data is in)
+export function Seg({ value, options, onChange, cls = '', label }) {
+  return html`<div class=${'seg ' + cls} role="group" aria-label=${label || null}>${options.map((o) => html`<button type="button" aria-pressed=${o.v === value ? 'true' : 'false'}
+    class=${o.v === value ? 'on' : ''} onClick=${() => onChange(o.v)}>${o.label}${o.n !== undefined && o.n !== null ? html`<span class="n">${o.n}</span>` : null}</button>`)}</div>`;
 }
 
 export function Ring({ value, max, size = 64 }) {
   const r = (size - 8) / 2, c = 2 * Math.PI * r, f = max ? Math.min(1, value / max) : 0;
   return html`<div class="ring" style=${`width:${size}px;height:${size}px`}><svg width=${size} height=${size}>
     <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke="var(--track)" stroke-width="7" />
-    <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke=${f >= 1 ? 'var(--green-f)' : 'var(--accent)'} stroke-width="7" stroke-linecap="round"
+    <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke=${f >= 1 ? 'var(--green-fill)' : 'var(--accent-ink)'} stroke-width="7" stroke-linecap="round"
       stroke-dasharray=${`${c * f} ${c}`} /></svg><div class="rv">${value}/${max}</div></div>`;
 }
 
@@ -163,40 +222,152 @@ export function Skel({ h = 16, w = '100%', cls = '' }) {
   return html`<div class=${'sk ' + cls} style=${`height:${h}px;width:${w}`}></div>`;
 }
 
-// right-hand sheet; Escape and the backdrop close it
-export function Drawer({ title, sub, icon, onClose, wide, footer, children, head }) {
+// ---------- dialogs: drawer (side panel), modal (confirm), sheet (phone menu) ----------
+// One rule for all three: focus moves in, Tab stays in, Escape closes only the top one, focus goes back to the button
+// that opened it, and closing plays a short animation (none when the phone or computer asks for less motion).
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+const dialogs = [];                                   // open dialogs, top one last
+const motionOk = () => document.documentElement.classList.contains('motion');
+let uid = 0;
+const nextId = () => 'dlg' + (++uid);
+
+function trapTab(e, box) {
+  const els = [...box.querySelectorAll(FOCUSABLE)].filter((el) => el.getClientRects().length);
+  if (!els.length) { e.preventDefault(); box.focus(); return; }
+  const first = els[0], last = els[els.length - 1], at = document.activeElement;
+  if (!box.contains(at)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+  else if (e.shiftKey && (at === first || at === box)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
+}
+
+function useDialog(ref, onEscape, focusSel) {
+  const esc = useRef(onEscape);
+  esc.current = onEscape;
   useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', k);
+    const me = {};
+    dialogs.push(me);
+    const opener = document.activeElement;
+    const box = ref.current;
+    const t = setTimeout(() => {                      // after the first paint, so the slide-in isn't interrupted
+      if (!box || box.contains(document.activeElement)) return;
+      const el = (focusSel && box.querySelector(focusSel)) || box;
+      el.focus({ preventScroll: true });
+    }, 40);
+    const key = (e) => {
+      if (dialogs[dialogs.length - 1] !== me || !box) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); esc.current(); }
+      else if (e.key === 'Tab') trapTab(e, box);
+    };
+    document.addEventListener('keydown', key);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('keydown', key);
+      const i = dialogs.indexOf(me);
+      if (i >= 0) dialogs.splice(i, 1);
+      const now = document.activeElement;
+      if (opener && opener.isConnected && opener !== document.body && (!now || now === document.body || !now.isConnected || box?.contains(now))) {
+        try { opener.focus({ preventScroll: true }); } catch { /* gone */ }
+      }
+    };
+  }, []);
+}
+
+// close with a short animation; a second close while it plays is ignored
+function useClosing(onClose) {
+  const [closing, setClosing] = useState(false);
+  const done = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const close = (...a) => {
+    if (done.current) return;
+    done.current = true;
+    const fin = () => {
+      onClose(...a);
+      setTimeout(() => { if (alive.current) { done.current = false; setClosing(false); } }, 60);   // still here: it stays open
+    };
+    if (!motionOk()) { fin(); return; }
+    setClosing(true);
+    setTimeout(fin, 150);
+  };
+  return [closing, close];
+}
+
+// right-hand panel; Escape, the × and the backdrop close it. Form panels put their buttons in `footer` (always visible).
+export function Drawer({ title, sub, icon, onClose, wide, footer, children, head }) {
+  const ref = useRef();
+  const [closing, close] = useClosing(onClose);
+  const [tid] = useState(nextId);
+  useDialog(ref, () => close(), isPhone() ? null : '.dr-b input:not([readonly]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),.dr-b select,.dr-b textarea');
+  useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { window.removeEventListener('keydown', k); document.body.style.overflow = prev; };
+    return () => { document.body.style.overflow = prev; };
   }, []);
-  return html`<div class="scrim" onMouseDown=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <aside class=${'drawer' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label=${title}>
+  return html`<div class=${'scrim' + (closing ? ' closing' : '')} onMouseDown=${(e) => { if (e.target === e.currentTarget) close(); }}>
+    <aside class=${'drawer' + (wide ? ' wide' : '') + (closing ? ' closing' : '')} role="dialog" aria-modal="true" aria-labelledby=${tid} tabindex="-1" ref=${ref}>
       <div class="dr-h">${head || (icon ? html`<div class="li-ic"><${Icon} n=${icon} /></div>` : null)}
-        <div class="grow"><h2>${title}</h2>${sub ? html`<div class="sub">${sub}</div>` : null}</div>
-        <${Btn} kind="ghost" cls="icon" icon="x" aria-label="Close" onClick=${onClose} /></div>
+        <div class="grow"><h2 id=${tid}>${title}</h2>${sub ? html`<div class="sub">${sub}</div>` : null}</div>
+        <${Btn} kind="ghost" cls="icon" icon="x" aria-label="Close" onClick=${() => close()} /></div>
       <div class="dr-b">${children}</div>
       ${footer ? html`<div class="dr-f">${footer}</div>` : null}
     </aside></div>`;
 }
 
-export function Modal({ title, text, ok = 'OK', cancel = 'Cancel', danger, onDone, children }) {
-  useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') onDone(false); };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  }, []);
-  return html`<div class="modal-scrim" onMouseDown=${(e) => { if (e.target === e.currentTarget) onDone(false); }}>
-    <div class="modal" role="alertdialog" aria-modal="true"><h3>${title}</h3>${text ? html`<p>${text}</p>` : null}${children}
-      <div class="row">${cancel ? html`<${Btn} onClick=${() => onDone(false)}>${cancel}<//>` : null}
-        <${Btn} kind=${danger ? 'danger solid' : 'primary'} onClick=${() => onDone(true)} autoFocus>${ok}<//></div></div></div>`;
+// a question before something that can't be undone. With `action`, OK runs it and stays busy until it's done; if it
+// fails, the reason shows here and nothing closes.
+// (a dangerous one starts on Cancel, so a stray Enter never deletes anything; `focus` picks another starting point)
+export function Modal({ title, text, ok = 'OK', cancel = 'Cancel', danger, onDone, action, focus, children }) {
+  const ref = useRef();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [closing, close] = useClosing(onDone);
+  const [tid] = useState(nextId);
+  const no = () => { if (!busy) close(false); };
+  useDialog(ref, no, focus || (danger ? '[data-cancel]' : '[data-ok]'));
+  const yes = async (e) => {
+    if (e) e.preventDefault();
+    if (busy) return;
+    if (!action) { close(true); return; }
+    setBusy(true); setErr(null);
+    try { await action(); close(true); } catch (x) { setErr(x); setBusy(false); }
+  };
+  return html`<div class=${'modal-scrim' + (closing ? ' closing' : '')} onMouseDown=${(e) => { if (e.target === e.currentTarget) no(); }}>
+    <form class=${'modal' + (closing ? ' closing' : '')} role="alertdialog" aria-modal="true" aria-labelledby=${tid} aria-describedby=${text ? tid + 't' : null}
+      tabindex="-1" ref=${ref} onSubmit=${yes} novalidate>
+      <h3 id=${tid}>${title}</h3>${text ? html`<p id=${tid + 't'}>${text}</p>` : null}${children}
+      <${ErrorBox} error=${err} />
+      <div class="row">${cancel ? html`<${Btn} data-cancel="1" disabled=${busy} onClick=${no}>${cancel}<//>` : null}
+        <${Btn} type="submit" data-ok="1" kind=${danger ? 'danger solid' : 'primary'} busy=${busy}>${ok}<//></div></form></div>`;
 }
 
-// loads data and keeps it fresh; `every` (ms) polls while the tab is visible
+// a menu that slides up from the bottom of a phone screen. Back, Escape or a tap outside closes it. `children` may be a
+// function that gets close(then): the menu closes first, then `then` runs (so Back never lands on the old page).
+export function Sheet({ title, onClose, children }) {
+  const ref = useRef();
+  const then = useRef(null);
+  const pushed = useRef(false);
+  const [closing, finish] = useClosing(() => { onClose(); const f = then.current; then.current = null; if (f) f(); });
+  const close = (fn) => {
+    then.current = fn || null;
+    if (pushed.current && history.state && history.state.mzSheet) { pushed.current = false; history.back(); }
+    else finish();
+  };
+  useEffect(() => {
+    try { history.pushState({ ...(history.state || {}), mzSheet: 1 }, ''); pushed.current = true; } catch { /* no history */ }
+    const pop = () => { pushed.current = false; finish(); };
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
+  }, []);
+  useDialog(ref, () => close(), null);
+  return html`<div class=${'sheet-scrim' + (closing ? ' closing' : '')} onMouseDown=${(e) => { if (e.target === e.currentTarget) close(); }}>
+    <div class=${'sheet' + (closing ? ' closing' : '')} role="dialog" aria-modal="true" aria-label=${title} tabindex="-1" ref=${ref}>
+      ${typeof children === 'function' ? children(close) : children}</div></div>`;
+}
+
+// loads data and keeps it fresh; `every` (ms) polls while the tab is visible. `at` = when it last loaded; `error` stays
+// until a load works again, so a page can show "Couldn't load…" (no data yet) or "Not updated since…" (old data).
 export function useLoad(fn, deps = [], { every = 0 } = {}) {
-  const [state, setState] = useState({ data: undefined, error: null, loading: true });
+  const [state, setState] = useState({ data: undefined, error: null, loading: true, at: 0 });
   const alive = useRef(true);
   const seq = useRef(0);
   const run = useCallback(async (quiet) => {
@@ -204,7 +375,7 @@ export function useLoad(fn, deps = [], { every = 0 } = {}) {
     if (!quiet) setState((s) => ({ ...s, loading: true }));
     try {
       const data = await fn();
-      if (alive.current && n === seq.current) setState({ data, error: null, loading: false });
+      if (alive.current && n === seq.current) setState({ data, error: null, loading: false, at: Date.now() });
     } catch (error) {
       if (alive.current && n === seq.current) setState((s) => ({ ...s, error, loading: false }));
     }
@@ -216,7 +387,8 @@ export function useLoad(fn, deps = [], { every = 0 } = {}) {
     if (every) t = setInterval(() => { if (document.visibilityState === 'visible') run(true); }, every);
     return () => { alive.current = false; if (t) clearInterval(t); };
   }, [run]);
-  return { ...state, reload: () => run(true), set: (data) => setState((s) => ({ ...s, data })) };
+  return { ...state, failed: !!state.error && state.data === undefined, reload: () => run(true), retry: () => run(false),
+    set: (data) => setState((s) => ({ ...s, data })) };
 }
 
 // ticks every `ms` so "2 min ago" stays true
